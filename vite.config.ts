@@ -16,10 +16,13 @@ export default defineConfig({
     },
   },
   server: {
+    host: true, // devtunnels에서 접근 가능하도록
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: process.env.VITE_API_BASE_URL || 'http://localhost:8080',
         changeOrigin: true,
+        secure: false,
+        ws: true,
       },
     },
   },

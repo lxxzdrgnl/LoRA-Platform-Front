@@ -5,7 +5,7 @@ const isLoading = ref(false);
 
 const handleGoogleLogin = () => {
   isLoading.value = true;
-  window.location.href = '/api/auth/google';
+  window.location.href = '/api/auth/google?prompt=select_account';
 };
 </script>
 

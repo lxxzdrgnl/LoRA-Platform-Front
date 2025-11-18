@@ -1,4 +1,6 @@
-const API_BASE_URL = 'http://localhost:8080';
+
+// ========== Configuration ==========
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 // ========== Types ==========
 export interface ApiResponse<T> {
@@ -22,6 +24,7 @@ export interface LoraModel {
   userNickname: string;
   title: string;
   description: string;
+  thumbnailUrl?: string;
   characterName?: string;
   style?: string;
   trainingImagesCount: number;
@@ -161,18 +164,18 @@ export const api = {
   // ========== Auth ==========
   auth: {
     async googleLogin(): Promise<void> {
-      window.location.href = `${API_BASE_URL}/api/auth/google`;
+      window.location.href = `${API_BASE_URL}/api/auth/google?prompt=select_account`;
     },
 
     async getCurrentUser(): Promise<ApiResponse<Record<string, unknown>>> {
-      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      const response = await fetch(`/api/auth/me`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
     },
 
     async refreshToken(refreshToken: string): Promise<ApiResponse<{ accessToken: string; refreshToken: string }>> {
-      const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+      const response = await fetch(`/api/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken }),
@@ -181,10 +184,49 @@ export const api = {
     },
 
     async logout(refreshToken: string): Promise<ApiResponse<void>> {
-      const response = await fetch(`${API_BASE_URL}/api/auth/logout`, {
+      const response = await fetch(`/api/auth/logout`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ refreshToken }),
+      });
+      return handleResponse(response);
+    },
+  },
+
+  // ========== Prompts ==========
+  prompts: {
+    async createPrompt(modelId: number, data: {
+      title: string;
+      prompt: string;
+      negativePrompt: string;
+      description?: string;
+    }): Promise<ApiResponse<PromptResponse>> {
+      const response = await fetch(`/api/models/${modelId}/prompts`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      });
+      return handleResponse(response);
+    },
+
+    async updatePrompt(modelId: number, promptId: number, data: {
+      title?: string;
+      prompt?: string;
+      negativePrompt?: string;
+      description?: string;
+    }): Promise<ApiResponse<PromptResponse>> {
+      const response = await fetch(`/api/models/${modelId}/prompts/${promptId}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      });
+      return handleResponse(response);
+    },
+
+    async deletePrompt(modelId: number, promptId: number): Promise<ApiResponse<void>> {
+      const response = await fetch(`/api/models/${modelId}/prompts/${promptId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
       });
       return handleResponse(response);
     },
@@ -194,7 +236,7 @@ export const api = {
   models: {
     async getPublicModels(page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
       const response = await fetch(
-        `${API_BASE_URL}/api/models?page=${page}&size=${size}&sort=createdAt,DESC`,
+        `/api/models?page=${page}&size=${size}&sort=createdAt,DESC`,
         { headers: getAuthHeaders() }
       );
       return handleResponse(response);
@@ -202,14 +244,14 @@ export const api = {
 
     async getPopularModels(page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
       const response = await fetch(
-        `${API_BASE_URL}/api/models/popular?page=${page}&size=${size}`,
+        `/api/models/popular?page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
       return handleResponse(response);
     },
 
     async getModelDetail(modelId: number): Promise<ApiResponse<ModelDetailResponse>> {
-      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}`, {
+      const response = await fetch(`/api/models/${modelId}`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
@@ -217,7 +259,7 @@ export const api = {
 
     async getMyModels(page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
       const response = await fetch(
-        `${API_BASE_URL}/api/models/my?page=${page}&size=${size}`,
+        `/api/models/my?page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
       return handleResponse(response);
@@ -230,7 +272,7 @@ export const api = {
       style?: string;
       isPublic: boolean;
     }): Promise<ApiResponse<LoraModel>> {
-      const response = await fetch(`${API_BASE_URL}/api/models`, {
+      const response = await fetch(`/api/models`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
@@ -248,7 +290,7 @@ export const api = {
         isPublic: boolean;
       }>
     ): Promise<ApiResponse<LoraModel>> {
-      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}`, {
+      const response = await fetch(`/api/models/${modelId}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
@@ -257,7 +299,7 @@ export const api = {
     },
 
     async deleteModel(modelId: number): Promise<ApiResponse<void>> {
-      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}`, {
+      const response = await fetch(`/api/models/${modelId}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
@@ -266,7 +308,7 @@ export const api = {
 
     async searchModels(query: string, page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
       const response = await fetch(
-        `${API_BASE_URL}/api/models/search?query=${encodeURIComponent(query)}&page=${page}&size=${size}`,
+        `/api/models/search?query=${encodeURIComponent(query)}&page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
       return handleResponse(response);
@@ -275,7 +317,7 @@ export const api = {
     async filterByTags(tags: string[], page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
       const tagParams = tags.map(tag => `tags=${encodeURIComponent(tag)}`).join('&');
       const response = await fetch(
-        `${API_BASE_URL}/api/models/filter?${tagParams}&page=${page}&size=${size}`,
+        `/api/models/filter?${tagParams}&page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
       return handleResponse(response);
@@ -285,7 +327,7 @@ export const api = {
   // ========== Community ==========
   community: {
     async toggleLike(modelId: number): Promise<ApiResponse<{ liked: boolean }>> {
-      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/like`, {
+      const response = await fetch(`/api/models/${modelId}/like`, {
         method: 'POST',
         headers: getAuthHeaders(),
       });
@@ -293,7 +335,7 @@ export const api = {
     },
 
     async toggleFavorite(modelId: number): Promise<ApiResponse<{ favorited: boolean }>> {
-      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/favorite`, {
+      const response = await fetch(`/api/models/${modelId}/favorite`, {
         method: 'POST',
         headers: getAuthHeaders(),
       });
@@ -301,7 +343,7 @@ export const api = {
     },
 
     async toggleCommentLike(modelId: number, commentId: number): Promise<ApiResponse<{ isLiked: boolean }>> {
-      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/comments/${commentId}/like`, {
+      const response = await fetch(`/api/models/${modelId}/comments/${commentId}/like`, {
         method: 'POST',
         headers: getAuthHeaders(),
       });
@@ -310,14 +352,14 @@ export const api = {
 
     async getComments(modelId: number, page = 0, size = 20): Promise<ApiResponse<PageResponse<CommentResponse>>> {
       const response = await fetch(
-        `${API_BASE_URL}/api/models/${modelId}/comments?page=${page}&size=${size}`,
+        `/api/models/${modelId}/comments?page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
       return handleResponse(response);
     },
 
     async createComment(modelId: number, content: string, parentCommentId?: number): Promise<ApiResponse<CommentResponse>> {
-      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/comments`, {
+      const response = await fetch(`/api/models/${modelId}/comments`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ content, parentCommentId }),
@@ -327,7 +369,7 @@ export const api = {
 
     async getFavoriteModels(page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
       const response = await fetch(
-        `${API_BASE_URL}/api/models/favorites?page=${page}&size=${size}`,
+        `/api/models/favorites?page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
       return handleResponse(response);
@@ -335,7 +377,7 @@ export const api = {
 
     async getLikedModels(page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
       const response = await fetch(
-        `${API_BASE_URL}/api/models/likes?page=${page}&size=${size}`,
+        `/api/models/likes?page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
       return handleResponse(response);
@@ -345,14 +387,14 @@ export const api = {
   // ========== Tags ==========
   tags: {
     async getAllTags(): Promise<ApiResponse<TagResponse[]>> {
-      const response = await fetch(`${API_BASE_URL}/api/tags`, {
+      const response = await fetch(`/api/tags`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
     },
 
     async getPopularTags(): Promise<ApiResponse<TagResponse[]>> {
-      const response = await fetch(`${API_BASE_URL}/api/tags/popular`, {
+      const response = await fetch(`/api/tags/popular`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
@@ -360,9 +402,26 @@ export const api = {
 
     async searchTags(keyword: string): Promise<ApiResponse<TagResponse[]>> {
       const response = await fetch(
-        `${API_BASE_URL}/api/tags/search?keyword=${encodeURIComponent(keyword)}`,
+        `/api/tags/search?keyword=${encodeURIComponent(keyword)}`,
         { headers: getAuthHeaders() }
       );
+      return handleResponse(response);
+    },
+
+    async addTagToModel(modelId: number, tagName: string, category?: string): Promise<ApiResponse<void>> {
+      const response = await fetch(`/api/tags/models/${modelId}`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ tagName, category }),
+      });
+      return handleResponse(response);
+    },
+
+    async removeTagFromModel(modelId: number, tagId: number): Promise<ApiResponse<void>> {
+      const response = await fetch(`/api/tags/models/${modelId}/tags/${tagId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
       return handleResponse(response);
     },
   },
@@ -370,14 +429,14 @@ export const api = {
   // ========== User ==========
   user: {
     async getMyProfile(): Promise<ApiResponse<UserResponse>> {
-      const response = await fetch(`${API_BASE_URL}/api/users/me`, {
+      const response = await fetch(`/api/users/me`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
     },
 
     async updateMyProfile(data: { nickname?: string; profileImageUrl?: string }): Promise<ApiResponse<UserResponse>> {
-      const response = await fetch(`${API_BASE_URL}/api/users/me`, {
+      const response = await fetch(`/api/users/me`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
@@ -386,7 +445,7 @@ export const api = {
     },
 
     async getUserProfile(userId: number): Promise<ApiResponse<UserResponse>> {
-      const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+      const response = await fetch(`/api/users/${userId}`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
@@ -397,7 +456,7 @@ export const api = {
   upload: {
     async getPresignedUrl(fileName: string): Promise<ApiResponse<{ presignedUrl: string }>> {
       const response = await fetch(
-        `${API_BASE_URL}/api/v1/upload-url?fileName=${encodeURIComponent(fileName)}`,
+        `/api/v1/upload-url?fileName=${encodeURIComponent(fileName)}`,
         { headers: getAuthHeaders() }
       );
       return handleResponse(response);
@@ -431,7 +490,7 @@ export const api = {
       baseModel?: string;
       isPublic?: boolean;
     }): Promise<ApiResponse<LoraModel>> {
-      const response = await fetch(`${API_BASE_URL}/api/models`, {
+      const response = await fetch(`/api/models`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
@@ -440,7 +499,7 @@ export const api = {
     },
 
     async createTrainingJob(modelId: number): Promise<ApiResponse<TrainingJobResponse>> {
-      const response = await fetch(`${API_BASE_URL}/api/training/models/${modelId}`, {
+      const response = await fetch(`/api/training/models/${modelId}`, {
         method: 'POST',
         headers: getAuthHeaders(),
       });
@@ -448,7 +507,7 @@ export const api = {
     },
 
     async startTraining(jobId: number, config: Record<string, unknown>): Promise<ApiResponse<Record<string, unknown>>> {
-      const response = await fetch(`${API_BASE_URL}/api/training/jobs/${jobId}/start`, {
+      const response = await fetch(`/api/training/jobs/${jobId}/start`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(config),
@@ -457,21 +516,21 @@ export const api = {
     },
 
     async getTrainingJob(jobId: number): Promise<ApiResponse<TrainingJobResponse>> {
-      const response = await fetch(`${API_BASE_URL}/api/training/jobs/${jobId}`, {
+      const response = await fetch(`/api/training/jobs/${jobId}`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
     },
 
     async getMyTrainingJobs(): Promise<ApiResponse<TrainingJobResponse[]>> {
-      const response = await fetch(`${API_BASE_URL}/api/training/my`, {
+      const response = await fetch(`/api/training/my`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
     },
 
     async deleteTrainingJob(jobId: number): Promise<ApiResponse<void>> {
-      const response = await fetch(`${API_BASE_URL}/api/training/jobs/${jobId}/fail`, {
+      const response = await fetch(`/api/training/jobs/${jobId}/fail`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ error: 'User cancelled' }),
@@ -480,7 +539,7 @@ export const api = {
     },
 
     streamTrainingProgress(onMessage: (data: Record<string, unknown>) => void): EventSource {
-      const eventSource = new EventSource(`${API_BASE_URL}/api/training/stream`);
+      const eventSource = new EventSource(`/api/training/stream`);
       eventSource.onmessage = (event) => {
         onMessage(JSON.parse(event.data));
       };
@@ -498,7 +557,7 @@ export const api = {
       guidanceScale?: number;
       seed?: number;
     }): Promise<ApiResponse<Record<string, unknown>>> {
-      const response = await fetch(`${API_BASE_URL}/api/generate`, {
+      const response = await fetch(`/api/generate`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
@@ -508,14 +567,14 @@ export const api = {
 
     async getMyGenerationHistory(page = 0, size = 20): Promise<ApiResponse<PageResponse<unknown>>> {
       const response = await fetch(
-        `${API_BASE_URL}/api/generate/history/my?page=${page}&size=${size}`,
+        `/api/generate/history/my?page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
       return handleResponse(response);
     },
 
     streamGenerationProgress(onMessage: (data: GenerationProgressResponse) => void): EventSource {
-      const eventSource = new EventSource(`${API_BASE_URL}/api/generate/stream`);
+      const eventSource = new EventSource(`/api/generate/stream`);
       eventSource.onmessage = (event) => {
         onMessage(JSON.parse(event.data));
       };
@@ -527,7 +586,7 @@ export const api = {
   search: {
     async search(query: string, page = 0, size = 20): Promise<ApiResponse<SearchAllResponse>> {
       const response = await fetch(
-        `${API_BASE_URL}/api/search?query=${encodeURIComponent(query)}&page=${page}&size=${size}`,
+        `/api/search?query=${encodeURIComponent(query)}&page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
       return handleResponse(response);
@@ -535,7 +594,7 @@ export const api = {
 
     async searchModels(query: string, page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
       const response = await fetch(
-        `${API_BASE_URL}/api/search/models?query=${encodeURIComponent(query)}&page=${page}&size=${size}`,
+        `/api/search/models?query=${encodeURIComponent(query)}&page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
       return handleResponse(response);
@@ -543,7 +602,7 @@ export const api = {
 
     async searchUsers(query: string, page = 0, size = 20): Promise<ApiResponse<PageResponse<SearchUserResponse>>> {
       const response = await fetch(
-        `${API_BASE_URL}/api/search/users?query=${encodeURIComponent(query)}&page=${page}&size=${size}`,
+        `/api/search/users?query=${encodeURIComponent(query)}&page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
       return handleResponse(response);

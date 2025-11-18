@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { api } from '../services/api';
+import { api, authStore } from '../services/api';
 
 const route = useRoute();
 const router = useRouter();
 const modelId = ref(Number(route.params.id));
 const loading = ref(true);
 const error = ref('');
+const isEditing = ref(false);
+const currentUser = ref<any>(null);
 
 const model = ref({
   id: 1,
@@ -52,11 +54,36 @@ const comments = ref([
 ]);
 
 const newComment = ref('');
+const availableTags = ref<any[]>([]);
+const newTagInput = ref('');
+const editingPromptId = ref<number | null>(null);
+const newPrompt = ref({
+  title: '',
+  prompt: '',
+  negativePrompt: '',
+  description: ''
+});
+
+const isOwner = computed(() => {
+  return currentUser.value && model.value.userId === currentUser.value.id;
+});
 
 onMounted(async () => {
+  await loadCurrentUser();
   await fetchModelDetails();
   await fetchComments();
 });
+
+const loadCurrentUser = async () => {
+  if (!authStore.isAuthenticated()) return;
+
+  try {
+    const response = await api.user.getMyProfile();
+    currentUser.value = response.data;
+  } catch (err) {
+    console.error('Failed to load current user:', err);
+  }
+};
 
 const fetchModelDetails = async () => {
   try {
@@ -132,6 +159,115 @@ const copyPrompt = (prompt: string) => {
 const goToGenerate = () => {
   router.push(`/generate?modelId=${modelId.value}`);
 };
+
+const startEdit = async () => {
+  isEditing.value = true;
+  await loadAvailableTags();
+};
+
+const cancelEdit = () => {
+  isEditing.value = false;
+  newTagInput.value = '';
+  editingPromptId.value = null;
+  resetNewPrompt();
+};
+
+const saveEdit = async () => {
+  isEditing.value = false;
+};
+
+const loadAvailableTags = async () => {
+  try {
+    const response = await api.tags.getAllTags();
+    availableTags.value = response.data;
+  } catch (err) {
+    console.error('Failed to load tags:', err);
+  }
+};
+
+const addTag = async () => {
+  if (!newTagInput.value.trim()) return;
+
+  try {
+    const tagName = newTagInput.value.trim();
+
+    // 태그가 이미 모델에 추가되어 있는지 확인
+    if (model.value.tags.find(t => t.name.toLowerCase() === tagName.toLowerCase())) {
+      alert('이미 추가된 태그입니다.');
+      return;
+    }
+
+    // 태그 이름으로 직접 추가 (없으면 백엔드에서 자동 생성)
+    await api.tags.addTagToModel(modelId.value, tagName);
+    await fetchModelDetails();
+    newTagInput.value = '';
+  } catch (err) {
+    console.error('Failed to add tag:', err);
+    alert('태그 추가에 실패했습니다.');
+  }
+};
+
+const removeTag = async (tagId: number) => {
+  try {
+    await api.tags.removeTagFromModel(modelId.value, tagId);
+    await fetchModelDetails();
+  } catch (err) {
+    console.error('Failed to remove tag:', err);
+  }
+};
+
+const resetNewPrompt = () => {
+  newPrompt.value = {
+    title: '',
+    prompt: '',
+    negativePrompt: '',
+    description: ''
+  };
+};
+
+const addNewPrompt = async () => {
+  if (!newPrompt.value.title || !newPrompt.value.prompt) return;
+
+  try {
+    await api.prompts.createPrompt(modelId.value, newPrompt.value);
+    await fetchModelDetails();
+    resetNewPrompt();
+  } catch (err) {
+    console.error('Failed to create prompt:', err);
+  }
+};
+
+const startEditPrompt = (prompt: any) => {
+  editingPromptId.value = prompt.id;
+  newPrompt.value = {
+    title: prompt.title,
+    prompt: prompt.prompt,
+    negativePrompt: prompt.negativePrompt,
+    description: prompt.description || ''
+  };
+};
+
+const savePromptEdit = async (promptId: number) => {
+  try {
+    await api.prompts.updatePrompt(modelId.value, promptId, newPrompt.value);
+    await fetchModelDetails();
+    editingPromptId.value = null;
+    resetNewPrompt();
+  } catch (err) {
+    console.error('Failed to update prompt:', err);
+  }
+};
+
+const deletePrompt = async (promptId: number) => {
+  if (!confirm('정말 이 프롬프트를 삭제하시겠습니까?')) return;
+
+  try {
+    await api.prompts.deletePrompt(modelId.value, promptId);
+    await fetchModelDetails();
+  } catch (err) {
+    console.error('Failed to delete prompt:', err);
+  }
+};
 </script>
 
 <template>
@@ -145,7 +281,7 @@ const goToGenerate = () => {
 
           <!-- Author -->
           <div class="flex items-center gap-md mb-lg">
-            <img src="https://via.placeholder.com/48" alt="Author" class="avatar avatar-lg" />
+            <img :src="model.userProfileImageUrl || 'https://via.placeholder.com/48'" alt="Author" class="avatar avatar-lg" />
             <div>
               <p class="font-semibold">{{ model.userNickname }}</p>
               <p class="text-sm text-secondary">View Profile</p>
@@ -153,29 +289,60 @@ const goToGenerate = () => {
           </div>
 
           <!-- Tags -->
-          <div class="flex flex-wrap gap-sm">
-            <span v-for="tag in model.tags" :key="tag.id" class="tag">
+          <div class="flex flex-wrap gap-sm items-center">
+            <span v-for="tag in model.tags" :key="tag.id" class="tag" :class="{ 'tag-removable': isEditing }">
               {{ tag.name }}
+              <button v-if="isEditing" @click="removeTag(tag.id)" class="tag-remove-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
             </span>
+            <div v-if="isEditing" class="flex gap-sm items-center">
+              <input
+                v-model="newTagInput"
+                type="text"
+                class="input-sm"
+                placeholder="태그 입력..."
+                @keyup.enter="addTag()"
+              />
+              <button @click="addTag()" :disabled="!newTagInput.trim()" class="btn btn-sm btn-primary">
+                추가
+              </button>
+            </div>
           </div>
         </div>
 
         <!-- Actions -->
         <div class="flex gap-sm">
-          <button class="btn btn-secondary btn-icon" @click="toggleLike" :class="{ 'btn-primary': model.isLiked }">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" :fill="model.isLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-            </svg>
-            {{ model.likeCount }}
-          </button>
-          <button class="btn btn-primary" @click="goToGenerate">
+          <button v-if="isOwner && !isEditing" class="btn btn-secondary" @click="startEdit">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-              <polyline points="17 8 12 3 7 8"></polyline>
-              <line x1="12" y1="3" x2="12" y2="15"></line>
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
             </svg>
-            이 모델로 생성하기
+            Edit Model
           </button>
+          <template v-if="isEditing">
+            <button class="btn btn-secondary" @click="cancelEdit">Cancel</button>
+            <button class="btn btn-primary" @click="saveEdit">Save Changes</button>
+          </template>
+          <template v-else>
+            <button class="btn btn-secondary btn-icon" @click="toggleLike" :class="{ 'btn-primary': model.isLiked }">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" :fill="model.isLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+              </svg>
+              {{ model.likeCount }}
+            </button>
+            <button class="btn btn-primary" @click="goToGenerate">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+              이 모델로 생성하기
+            </button>
+          </template>
         </div>
       </div>
 
@@ -204,10 +371,63 @@ const goToGenerate = () => {
 
     <!-- Prompts -->
     <section class="prompts-section mb-xl">
-      <h2 class="text-2xl font-bold mb-lg">Prompt Examples</h2>
+      <div class="flex items-center justify-between mb-lg">
+        <h2 class="text-2xl font-bold">Prompt Examples</h2>
+        <button v-if="isEditing && !editingPromptId" @click="editingPromptId = -1" class="btn btn-sm btn-primary">
+          새 프롬프트 추가
+        </button>
+      </div>
+
+      <!-- New/Edit Prompt Form -->
+      <div v-if="isEditing && editingPromptId !== null" class="card mb-lg">
+        <h3 class="font-semibold mb-md">{{ editingPromptId === -1 ? '새 프롬프트' : '프롬프트 수정' }}</h3>
+        <div class="form-group mb-md">
+          <label class="label">제목</label>
+          <input v-model="newPrompt.title" type="text" class="input" placeholder="프롬프트 제목" />
+        </div>
+        <div class="form-group mb-md">
+          <label class="label">Positive Prompt</label>
+          <textarea v-model="newPrompt.prompt" class="textarea" rows="3" placeholder="포지티브 프롬프트"></textarea>
+        </div>
+        <div class="form-group mb-md">
+          <label class="label">Negative Prompt</label>
+          <textarea v-model="newPrompt.negativePrompt" class="textarea" rows="3" placeholder="네거티브 프롬프트"></textarea>
+        </div>
+        <div class="form-group mb-md">
+          <label class="label">설명 (선택사항)</label>
+          <input v-model="newPrompt.description" type="text" class="input" placeholder="프롬프트 설명" />
+        </div>
+        <div class="flex gap-sm">
+          <button @click="editingPromptId === -1 ? addNewPrompt() : savePromptEdit(editingPromptId)" class="btn btn-primary">
+            {{ editingPromptId === -1 ? '추가' : '저장' }}
+          </button>
+          <button @click="editingPromptId = null; resetNewPrompt();" class="btn btn-secondary">
+            취소
+          </button>
+        </div>
+      </div>
+
       <div class="grid grid-cols-1 gap-lg">
         <div v-for="prompt in model.prompts" :key="prompt.id" class="card">
-          <h3 class="font-semibold mb-md">{{ prompt.title }}</h3>
+          <div class="flex items-center justify-between mb-md">
+            <h3 class="font-semibold">{{ prompt.title }}</h3>
+            <div v-if="isEditing" class="flex gap-sm">
+              <button @click="startEditPrompt(prompt)" class="btn btn-ghost btn-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+                수정
+              </button>
+              <button @click="deletePrompt(prompt.id)" class="btn btn-ghost btn-sm text-error">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                삭제
+              </button>
+            </div>
+          </div>
           <div class="prompt-box mb-md">
             <div class="flex items-center justify-between mb-sm">
               <span class="text-sm text-secondary">Positive Prompt</span>
@@ -331,5 +551,45 @@ const goToGenerate = () => {
   .flex-col-mobile {
     flex-direction: column;
   }
+}
+
+.tag-removable {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding-right: var(--space-xs);
+}
+
+.tag-remove-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-error);
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.tag-remove-btn:hover {
+  background-color: rgba(255, 71, 87, 0.1);
+}
+
+.input-sm, .btn-sm {
+  padding: var(--space-xs) var(--space-sm);
+  font-size: 14px;
+}
+
+.input-sm {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.text-error {
+  color: var(--text-error);
 }
 </style>

@@ -366,10 +366,10 @@ api.community.createComment(modelId, content, parentCommentId?)
 
 ## TODO
 
-- [ ] 파일 업로드 기능 (이미지)
+- [v] 파일 업로드 기능 (이미지)
 - [ ] 무한 스크롤 페이지네이션
-- [ ] 다크/라이트 모드 토글
-- [ ] 모바일 반응형 개선
+- [v] 다크/라이트 모드 토글
+- [v] 모바일 반응형 개선
 - [ ] 에러 토스트 알림
 - [ ] 로딩 스켈레톤 UI
 
