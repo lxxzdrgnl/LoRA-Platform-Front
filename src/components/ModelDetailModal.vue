@@ -200,7 +200,7 @@ const deleteComment = async (commentId: number) => {
 
               <!-- Sample Images -->
               <section class="samples-section mb-lg">
-                <div class="grid grid-cols-2 gap-lg hide-scrollbar">
+                <div class="grid grid-cols-3 gap-lg hide-scrollbar">
                   <div v-for="sample in model.samples" :key="sample.id" class="sample-item">
                     <img :src="sample.imageUrl" alt="Sample" class="img-cover rounded-lg" />
                   </div>
@@ -388,8 +388,9 @@ const deleteComment = async (commentId: number) => {
 }
 
 .sample-item {
-  aspect-ratio: 0.8;
+  aspect-ratio: 1;
   overflow: hidden; /* Ensure content doesn't overflow during scale */
+  border-radius: var(--radius-lg); /* Apply border-radius to the parent container */
 }
 
 .sample-item img {

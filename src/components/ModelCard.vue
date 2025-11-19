@@ -82,8 +82,6 @@ defineEmits(['click']);
 .model-card {
   overflow: hidden;
   padding: 0;
-  height: auto;
-  aspect-ratio: 4 / 3;
   border-radius: var(--radius-lg); /* Ensure card has rounding */
 }
 

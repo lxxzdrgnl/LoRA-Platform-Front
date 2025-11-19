@@ -5,7 +5,11 @@ import GenerateModal from '../components/GenerateModal.vue';
 import ModelDetailModal from '../components/ModelDetailModal.vue';
 import { api, type LoraModel, type TagResponse } from '../services/api';
 
-const models = ref<LoraModel[]>([]);
+interface LoraModelWithSize extends LoraModel {
+  size?: 'large';
+}
+
+const models = ref<LoraModelWithSize[]>([]);
 const loading = ref(true);
 const error = ref('');
 const activeTab = ref<'recent' | 'popular'>('popular');
@@ -47,14 +51,21 @@ const fetchModels = async () => {
       response = await api.search.searchModels(searchQuery.value, currentPage.value, pageSize);
     } else if (selectedTags.value.length > 0) {
       response = await api.models.filterByTags(selectedTags.value, currentPage.value, pageSize);
-      console.log('Filtered models response:', response.data.content);
     } else if (activeTab.value === 'popular') {
       response = await api.models.getPopularModels(currentPage.value, pageSize);
     } else {
       response = await api.models.getPublicModels(currentPage.value, pageSize);
     }
 
-    models.value = response.data.content;
+    const modelsWithSizes: LoraModelWithSize[] = response.data.content.map((model) => {
+      const rand = Math.random();
+      if (rand < 0.15) { // 15% chance for a large card
+        return { ...model, size: 'large' };
+      }
+      return model;
+    });
+
+    models.value = modelsWithSizes;
     totalPages.value = response.data.totalPages;
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to load models';
@@ -225,11 +236,12 @@ const handleOpenGenerate = (modelId: number) => {
             <div class="skeleton mt-sm" style="height: 16px; width: 60%;"></div>
           </div>
         </div>
-        <div v-else-if="models.length" class="grid grid-cols-4 gap-lg">
+        <div v-else-if="models.length" class="models-grid-container">
           <ModelCard
             v-for="model in models"
             :key="model.id"
             :id="model.id"
+            :class="{ 'model-card-large': model.size === 'large' }"
             :title="model.title"
             :description="model.description"
             :userNickname="model.userNickname"
@@ -396,5 +408,28 @@ const handleOpenGenerate = (modelId: number) => {
 .skeleton-card {
   display: flex;
   flex-direction: column;
+}
+
+.models-grid-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-auto-rows: 250px;
+  grid-auto-flow: dense;
+  gap: var(--space-lg);
+}
+
+.model-card-large {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+
+@media (max-width: 768px) {
+  .models-grid-container {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+  .model-card-large {
+    grid-column: span 1;
+    grid-row: span 1;
+  }
 }
 </style>
