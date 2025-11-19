@@ -545,6 +545,13 @@ onUnmounted(() => {
   background: var(--bg-dark);
 }
 
+.config-section > .card,
+.history-section > .card {
+  background-color: var(--bg-dark);
+  border: none;
+  box-shadow: none;
+}
+
 .animation-container {
   position: absolute;
   top: 0;
