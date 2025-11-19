@@ -59,7 +59,7 @@ const fetchModels = async () => {
 
     const modelsWithSizes: LoraModelWithSize[] = response.data.content.map((model) => {
       const rand = Math.random();
-      if (rand < 0.15) { // 15% chance for a large card
+      if (rand < 0.18) { // 15% chance for a large card
         return { ...model, size: 'large' };
       }
       return model;
@@ -146,7 +146,7 @@ const handleOpenGenerate = (modelId: number) => {
     <header class="hero-section">
       <div class="animation-container">
         <div class="petal-container">
-          <div v-for="i in 15" :key="i" :class="`petal petal-${i}`"></div>
+          <div v-for="i in 20" :key="i" :class="`petal petal-${i}`"></div>
         </div>
         <div class="shape shape1"></div>
         <div class="shape shape2"></div>
@@ -350,7 +350,21 @@ const handleOpenGenerate = (modelId: number) => {
 .petal-13 { left: 35%; animation-delay: 1.5s; width: 20px; height: 25px; animation-name: fall2; animation-duration: 18s; }
 .petal-14 { left: 45%; animation-delay: 5.5s; width: 12px; height: 17px; animation-name: fall3; animation-duration: 11s; }
 .petal-15 { left: 55%; animation-delay: 0.5s; width: 16px; height: 22px; animation-name: fall2; animation-duration: 14s; }
-
+.petal-16 { left: 65%; animation-delay: 8.5s; width: 14px; height: 18px; animation-duration: 19s; background-color: rgba(135, 206, 250, 0.7); }
+.petal-17 { left: 75%; animation-delay: 3.5s; width: 18px; height: 24px; animation-duration: 16s; }
+.petal-18 { left: 85%; animation-delay: 1.2s; width: 20px; height: 26px; animation-name: fall3; animation-duration: 12s; background-color: rgba(135, 206, 250, 0.7); }
+.petal-19 { left: 95%; animation-delay: 4.5s; width: 15px; height: 20px; animation-duration: 15s; }
+.petal-20 { left: 2%; animation-delay: 9.5s; width: 12px; height: 16px; animation-name: fall2; animation-duration: 18s; }
+.petal-21 { left: 12%; animation-delay: 0.2s; width: 18px; height: 24px; animation-duration: 13s; background-color: rgba(135, 206, 250, 0.7); }
+.petal-22 { left: 22%; animation-delay: 5.2s; width: 16px; height: 21px; animation-duration: 17s; }
+.petal-23 { left: 32%; animation-delay: 2.8s; width: 14px; height: 18px; animation-name: fall3; animation-duration: 11s; }
+.petal-24 { left: 42%; animation-delay: 7.8s; width: 20px; height: 26px; animation-duration: 19s; }
+.petal-25 { left: 52%; animation-delay: 1.8s; width: 15px; height: 20px; animation-name: fall2; animation-duration: 12s; background-color: rgba(135, 206, 250, 0.7); }
+.petal-26 { left: 62%; animation-delay: 6.8s; width: 22px; height: 28px; animation-duration: 16s; }
+.petal-27 { left: 72%; animation-delay: 3.8s; width: 17px; height: 22px; animation-duration: 13s; }
+.petal-28 { left: 82%; animation-delay: 8.8s; width: 13px; height: 19px; animation-name: fall3; animation-duration: 15s; }
+.petal-29 { left: 92%; animation-delay: 4.8s; width: 19px; height: 25px; animation-duration: 17s; background-color: rgba(135, 206, 250, 0.7); }
+.petal-30 { left: 98%; animation-delay: 2.2s; width: 15px; height: 20px; animation-name: fall2; animation-duration: 14s; }
 
 @keyframes fall {
   0% { top: -10%; opacity: 0; transform: translateX(0) rotate(0deg); }
@@ -375,6 +389,8 @@ const handleOpenGenerate = (modelId: number) => {
   position: absolute;
   mix-blend-mode: screen;
   filter: blur(120px);
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
 }
 
 .shape1 {
@@ -384,7 +400,8 @@ const handleOpenGenerate = (modelId: number) => {
   top: -150px;
   left: -150px;
   border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
-  animation: move1 25s infinite alternate;
+  animation-name: move1, pulse-glow;
+  animation-duration: 25s, 8s;
 }
 
 .shape2 {
@@ -394,7 +411,9 @@ const handleOpenGenerate = (modelId: number) => {
   bottom: -100px;
   right: -100px;
   border-radius: 60% 40% 30% 70% / 50% 60% 40% 50%;
-  animation: move2 30s infinite alternate-reverse;
+  animation-name: move2, pulse-glow;
+  animation-duration: 30s, 10s;
+  animation-direction: alternate-reverse, alternate;
 }
 
 .shape3 {
@@ -404,7 +423,8 @@ const handleOpenGenerate = (modelId: number) => {
   bottom: 50px;
   left: 15%;
   border-radius: 50% 50% 30% 70% / 60% 40% 60% 40%;
-  animation: move3 20s infinite alternate;
+  animation-name: move3, pulse-glow;
+  animation-duration: 20s, 9s;
 }
 
 @keyframes move1 {
@@ -418,6 +438,11 @@ const handleOpenGenerate = (modelId: number) => {
 @keyframes move3 {
   from { transform: translate(0, 0) rotate(0deg) scale(1); }
   to { transform: translate(50px, -100px) rotate(60deg) scale(1.1); }
+}
+@keyframes pulse-glow {
+  0% { opacity: 0.5; }
+  50% { opacity: 0.8; }
+  100% { opacity: 0.5; }
 }
 
 .hero-title, .hero-subtitle, .hero-actions {

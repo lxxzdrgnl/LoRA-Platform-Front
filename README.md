@@ -3,6 +3,7 @@
 블랙과 화이트 모노톤 디자인의 LoRA 모델 공유 플랫폼 프론트엔드
 
 ![LoRA Platform Screenshot](./choan.png)
+![LoRA Platform Screenshot](./choan2.png)
 
 ## 기술 스택
 

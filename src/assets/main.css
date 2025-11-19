@@ -2,20 +2,20 @@
 
 /* ========== CSS Variables ========== */
 :root {
-  --primary: #0047AB; /* Cobalt Blue */
-  --primary-dark: #003380; /* Darker Cobalt Blue */
-  --accent: #0047AB; /* Cobalt Blue */
+  --primary: #3B82F6; /* Vibrant Blue */
+  --primary-dark: #2563EB; /* Darker Vibrant Blue */
+  --accent: #3B82F6; /* Vibrant Blue */
 
-  --bg-dark: #0d0d0d; /* Very dark gray */
-  --bg-dark-rgb: 13, 13, 13;
-  --bg-card: #1a1a1a; /* Lighter dark gray */
-  --bg-card-rgb: 26, 26, 26;
-  --bg-hover: #2a2a2a; /* Lighter gray for hover */
-  --border: #2a2a2a;
+  --bg-dark: #1A1A1D; /* Deep Space */
+  --bg-dark-rgb: 26, 26, 29;
+  --bg-card: #28282B; /* Raised Card */
+  --bg-card-rgb: 40, 40, 43;
+  --bg-hover: #3A3A3D; /* Hover light */
+  --border: #4A4A4F; /* Visible Border */
 
-  --text-primary: #f0f0f0; /* Soft white */
-  --text-secondary: #a0a0a0; /* Light gray */
-  --text-muted: #606060;
+  --text-primary: #FFFFFF; /* Pure White */
+  --text-secondary: #BDBDBD; /* Lighter Gray */
+  --text-muted: #828282; /* Muted Gray */
 
   --success: #22c55e; /* Green */
   --error: #ef4444;   /* Red */
@@ -40,7 +40,7 @@
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.5);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.6);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.7);
-  --shadow-glow: 0 0 20px rgba(0, 71, 171, 0.4); /* Cobalt Blue Glow */
+  --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.4); /* Vibrant Blue Glow */
 }
 
 [data-theme='light'] {
@@ -277,7 +277,7 @@ body {
 
 .btn-primary {
   background: var(--primary);
-  color: var(--text-primary);
+  color: #FFFFFF;
   box-shadow: var(--shadow-glow);
 }
 
@@ -288,7 +288,7 @@ body {
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-2px);
   background: var(--primary-dark);
-  box-shadow: 0 6px 24px rgba(0, 71, 171, 0.3);
+  box-shadow: 0 6px 24px rgba(59, 130, 246, 0.3);
 }
 
 .btn-secondary {
@@ -342,7 +342,7 @@ body {
 .input:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(0, 71, 171, 0.2);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
 }
 
 .input::placeholder {
@@ -366,7 +366,7 @@ body {
 .textarea:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(0, 71, 171, 0.2);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
 }
 
 .label {
@@ -393,7 +393,7 @@ body {
 }
 
 .badge-primary {
-  background: rgba(0, 71, 171, 0.15);
+  background: rgba(59, 130, 246, 0.15);
   color: var(--primary);
 }
 
@@ -440,7 +440,7 @@ body {
 .tag.active {
   background: var(--primary);
   border-color: transparent;
-  color: var(--text-primary);
+  color: #FFFFFF;
 }
 
 /* ========== Images ========== */
