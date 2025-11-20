@@ -358,8 +358,8 @@ onUnmounted(() => {
               </div>
               <div v-else class="images-grid">
                 <div v-for="(url, index) in generatedImages" :key="index" class="image-item">
-                  <img :src="url" :alt="`Generated ${index + 1}`" class="img-cover rounded" />
-                  <div class="image-actions mt-sm flex gap-sm">
+                  <img :src="url" :alt="`Generated ${index + 1}`" class="img-cover" />
+                  <div class="image-actions">
                     <button class="btn btn-secondary btn-sm flex-1" @click="downloadImage(url, index)">
                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -431,9 +431,13 @@ onUnmounted(() => {
             <div v-if="filteredCommunityModels.length === 0" class="text-center py-xl">
               <p>No models found.</p>
             </div>
-            <div v-for="model in filteredCommunityModels" :key="model.id" class="card model-item" @click="selectModel(model)">
-              <h4>{{ model.title }}</h4>
-              <p>by {{ model.userNickname }}</p>
+            <div v-for="model in filteredCommunityModels" :key="model.id" class="model-item" @click="selectModel(model)">
+              <img :src="model.thumbnailUrl || 'https://via.placeholder.com/150'" alt="Model thumbnail" class="model-item-image">
+              <div class="model-item-info">
+                <h4>{{ model.title }}</h4>
+                <p class="model-item-description">{{ model.description }}</p>
+                <p class="model-item-author">by {{ model.userNickname }}</p>
+              </div>
             </div>
           </div>
         </div>
@@ -524,9 +528,36 @@ onUnmounted(() => {
 }
 
 .image-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
   background: var(--bg-hover);
-  padding: var(--space-sm);
-  border-radius: var(--radius-md);
+}
+
+.image-item .img-cover {
+  transition: transform 0.3s ease;
+}
+
+.image-item:hover .img-cover {
+  transform: scale(1.05);
+}
+
+.image-actions {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.image-item:hover .image-actions {
+  opacity: 1;
 }
 
 .modal-overlay-inner {
@@ -589,11 +620,61 @@ onUnmounted(() => {
 
 .model-item {
   cursor: pointer;
-  padding: var(--space-md);
   border-radius: var(--radius-md);
+  display: flex;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  transition: background-color 0.2s ease;
+  border: 1px solid var(--border); /* Adding a border to make it look like a card */
 }
+
 .model-item:hover {
   background: var(--bg-hover);
+  border-color: var(--border-hover);
+}
+
+.model-item-image {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.model-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.model-item-info h4 {
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+
+.model-item-description {
+  font-size: 14px;
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  margin: 0;
+  flex-grow: 1;
+}
+
+.model-item-author {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+  margin-top: auto;
 }
 
 @media (max-width: 1024px) {

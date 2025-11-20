@@ -161,7 +161,7 @@ const saveProfile = async () => {
     <!-- Profile Content -->
     <div v-else-if="user">
       <!-- Profile Header Card -->
-      <div class="card mb-xl">
+      <div class="card mb-lg mt-lg">
         <div class="flex items-start gap-lg flex-col-mobile">
           <!-- Avatar -->
           <img
@@ -366,6 +366,8 @@ const saveProfile = async () => {
   height: 120px;
 }
 
+
+
 .tabs-container {
   display: flex;
   gap: var(--space-sm);
@@ -419,6 +421,8 @@ const saveProfile = async () => {
 
   .tab-btn {
     white-space: nowrap;
+    padding: var(--space-md) var(--space-xs);
   }
+  
 }
 </style>
