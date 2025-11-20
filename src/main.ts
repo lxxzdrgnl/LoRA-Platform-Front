@@ -5,11 +5,16 @@ import './assets/main.css'
 import favicon from './assets/favicon_v2.svg'
 
 const setFavicon = () => {
-  const link = document.querySelector("link[rel*='icon']") || document.createElement('link');
-  link.type = 'image/svg+xml';
-  link.rel = 'icon';
-  link.href = favicon;
-  document.getElementsByTagName('head')[0].appendChild(link);
+  let link = document.querySelector<HTMLLinkElement>("link[rel*='icon']");
+  if (link) {
+    link.href = favicon;
+  } else {
+    link = document.createElement('link');
+    link.rel = 'icon';
+    link.href = favicon;
+    link.type = 'image/svg+xml';
+    document.head.appendChild(link);
+  }
 };
 
 setFavicon();
