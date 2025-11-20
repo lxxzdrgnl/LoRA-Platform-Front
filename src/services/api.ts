@@ -179,14 +179,14 @@ export const api = {
     },
 
     async getCurrentUser(): Promise<ApiResponse<Record<string, unknown>>> {
-      const response = await fetch(`/api/auth/me`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
     },
 
     async refreshToken(refreshToken: string): Promise<ApiResponse<{ accessToken: string; refreshToken: string }>> {
-      const response = await fetch(`/api/auth/refresh`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken }),
@@ -195,7 +195,7 @@ export const api = {
     },
 
     async logout(refreshToken: string): Promise<ApiResponse<void>> {
-      const response = await fetch(`/api/auth/logout`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/logout`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ refreshToken }),
@@ -212,7 +212,7 @@ export const api = {
       negativePrompt: string;
       description?: string;
     }): Promise<ApiResponse<PromptResponse>> {
-      const response = await fetch(`/api/models/${modelId}/prompts`, {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/prompts`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
@@ -226,7 +226,7 @@ export const api = {
       negativePrompt?: string;
       description?: string;
     }): Promise<ApiResponse<PromptResponse>> {
-      const response = await fetch(`/api/models/${modelId}/prompts/${promptId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/prompts/${promptId}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
@@ -235,7 +235,7 @@ export const api = {
     },
 
     async deletePrompt(modelId: number, promptId: number): Promise<ApiResponse<void>> {
-      const response = await fetch(`/api/models/${modelId}/prompts/${promptId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/prompts/${promptId}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
@@ -262,7 +262,7 @@ export const api = {
     },
 
     async getModelDetail(modelId: number): Promise<ApiResponse<ModelDetailResponse>> {
-      const response = await fetch(`/api/models/${modelId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
@@ -283,7 +283,7 @@ export const api = {
       style?: string;
       isPublic: boolean;
     }): Promise<ApiResponse<LoraModel>> {
-      const response = await fetch(`/api/models`, {
+      const response = await fetch(`${API_BASE_URL}/api/models`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
@@ -301,7 +301,7 @@ export const api = {
         isPublic: boolean;
       }>
     ): Promise<ApiResponse<LoraModel>> {
-      const response = await fetch(`/api/models/${modelId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
@@ -310,7 +310,7 @@ export const api = {
     },
 
     async deleteModel(modelId: number): Promise<ApiResponse<void>> {
-      const response = await fetch(`/api/models/${modelId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
@@ -338,7 +338,7 @@ export const api = {
   // ========== Community ==========
   community: {
     async toggleLike(modelId: number): Promise<ApiResponse<{ liked: boolean }>> {
-      const response = await fetch(`/api/models/${modelId}/like`, {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/like`, {
         method: 'POST',
         headers: getAuthHeaders(),
       });
@@ -346,7 +346,7 @@ export const api = {
     },
 
     async toggleFavorite(modelId: number): Promise<ApiResponse<{ favorited: boolean }>> {
-      const response = await fetch(`/api/models/${modelId}/favorite`, {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/favorite`, {
         method: 'POST',
         headers: getAuthHeaders(),
       });
@@ -354,7 +354,7 @@ export const api = {
     },
 
     async toggleCommentLike(modelId: number, commentId: number): Promise<ApiResponse<{ isLiked: boolean }>> {
-      const response = await fetch(`/api/models/${modelId}/comments/${commentId}/like`, {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/comments/${commentId}/like`, {
         method: 'POST',
         headers: getAuthHeaders(),
       });
@@ -370,7 +370,7 @@ export const api = {
     },
 
     async createComment(modelId: number, content: string, parentCommentId?: number): Promise<ApiResponse<CommentResponse>> {
-      const response = await fetch(`/api/models/${modelId}/comments`, {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/comments`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ content, parentCommentId }),
@@ -379,7 +379,7 @@ export const api = {
     },
 
     async deleteComment(modelId: number, commentId: number): Promise<ApiResponse<void>> {
-      const response = await fetch(`/api/models/${modelId}/comments/${commentId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/comments/${commentId}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
@@ -406,14 +406,14 @@ export const api = {
   // ========== Tags ==========
   tags: {
     async getAllTags(): Promise<ApiResponse<TagResponse[]>> {
-      const response = await fetch(`/api/tags`, {
+      const response = await fetch(`${API_BASE_URL}/api/tags`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
     },
 
     async getPopularTags(): Promise<ApiResponse<TagResponse[]>> {
-      const response = await fetch(`/api/tags/popular`, {
+      const response = await fetch(`${API_BASE_URL}/api/tags/popular`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
@@ -428,7 +428,7 @@ export const api = {
     },
 
     async addTagToModel(modelId: number, tagName: string, category?: string): Promise<ApiResponse<void>> {
-      const response = await fetch(`/api/tags/models/${modelId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/tags/models/${modelId}`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ tagName, category }),
@@ -437,7 +437,7 @@ export const api = {
     },
 
     async removeTagFromModel(modelId: number, tagId: number): Promise<ApiResponse<void>> {
-      const response = await fetch(`/api/tags/models/${modelId}/tags/${tagId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/tags/models/${modelId}/tags/${tagId}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
@@ -448,14 +448,14 @@ export const api = {
   // ========== User ==========
   user: {
     async getMyProfile(): Promise<ApiResponse<UserResponse>> {
-      const response = await fetch(`/api/users/me`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/me`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
     },
 
     async updateMyProfile(data: { nickname?: string; profileImageUrl?: string }): Promise<ApiResponse<UserResponse>> {
-      const response = await fetch(`/api/users/me`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/me`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
@@ -464,7 +464,7 @@ export const api = {
     },
 
     async getUserProfile(userId: number): Promise<ApiResponse<UserResponse>> {
-      const response = await fetch(`/api/users/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
@@ -474,7 +474,7 @@ export const api = {
   // ========== Upload ==========
   upload: {
     async getPresignedUrls(fileNames: string[]): Promise<ApiResponse<{ uploadUrls: string[]; downloadUrls: string[] }>> {
-      const response = await fetch(`/api/training/upload-urls`, {
+      const response = await fetch(`${API_BASE_URL}/api/training/upload-urls`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ fileNames }),
@@ -510,7 +510,7 @@ export const api = {
       baseModel?: string;
       isPublic?: boolean;
     }): Promise<ApiResponse<LoraModel>> {
-      const response = await fetch(`/api/models`, {
+      const response = await fetch(`${API_BASE_URL}/api/models`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
@@ -519,7 +519,7 @@ export const api = {
     },
 
     async createTrainingJob(modelId: number): Promise<ApiResponse<TrainingJobResponse>> {
-      const response = await fetch(`/api/training/models/${modelId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/training/models/${modelId}`, {
         method: 'POST',
         headers: getAuthHeaders(),
       });
@@ -532,7 +532,7 @@ export const api = {
       trainingImageUrls: string[];
       callbackBaseUrl?: string;
     }): Promise<ApiResponse<Record<string, unknown>>> {
-      const response = await fetch(`/api/training/jobs/${jobId}/start`, {
+      const response = await fetch(`${API_BASE_URL}/api/training/jobs/${jobId}/start`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(config),
@@ -541,21 +541,21 @@ export const api = {
     },
 
     async getTrainingJob(jobId: number): Promise<ApiResponse<TrainingJobResponse>> {
-      const response = await fetch(`/api/training/jobs/${jobId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/training/jobs/${jobId}`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
     },
 
     async getMyTrainingJobs(): Promise<ApiResponse<TrainingJobResponse[]>> {
-      const response = await fetch(`/api/training/my`, {
+      const response = await fetch(`${API_BASE_URL}/api/training/my`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
     },
 
     async deleteTrainingJob(jobId: number): Promise<ApiResponse<void>> {
-      const response = await fetch(`/api/training/jobs/${jobId}/fail`, {
+      const response = await fetch(`${API_BASE_URL}/api/training/jobs/${jobId}/fail`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ error: 'User cancelled' }),
@@ -564,7 +564,7 @@ export const api = {
     },
 
     streamTrainingProgress(onMessage: (data: Record<string, unknown>) => void): EventSource {
-      const eventSource = new EventSource(`/api/training/stream`);
+      const eventSource = new EventSource(`${API_BASE_URL}/api/training/stream`);
       eventSource.onmessage = (event) => {
         onMessage(JSON.parse(event.data));
       };
@@ -584,7 +584,7 @@ export const api = {
       seed?: number;
     }): Promise<ApiResponse<Record<string, unknown>>> {
       console.log('API Request - POST /api/generate:', data);
-      const response = await fetch(`/api/generate`, {
+      const response = await fetch(`${API_BASE_URL}/api/generate`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
@@ -602,7 +602,7 @@ export const api = {
     },
 
     streamGenerationProgress(onMessage: (data: GenerationProgressResponse) => void): EventSource {
-      const eventSource = new EventSource(`/api/generate/stream`);
+      const eventSource = new EventSource(`${API_BASE_URL}/api/generate/stream`);
       eventSource.onmessage = (event) => {
         onMessage(JSON.parse(event.data));
       };
