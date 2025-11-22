@@ -39,6 +39,7 @@ const totalSteps = ref(0);
 const statusMessage = ref('');
 
 let eventSource: EventSource | null = null;
+let currentHistoryId: number | null = null;
 
 // Watch for the modal to open
 watch(() => props.show, async (newVal) => {
@@ -48,11 +49,26 @@ watch(() => props.show, async (newVal) => {
     error.value = '';
     prompt.value = '';
     selectedModel.value = null;
+    currentHistoryId = null;
+    isGenerating.value = false;
+    currentStep.value = 0;
+    totalSteps.value = 0;
+    statusMessage.value = '';
 
     await loadModels();
     if (props.initialModelId) {
       await selectModelById(props.initialModelId);
     }
+
+    // 진행 중인 작업 확인
+    await checkOngoingGeneration();
+  } else {
+    // 모달 닫을 때 SSE 연결 종료
+    if (eventSource) {
+      eventSource.close();
+      eventSource = null;
+    }
+    currentHistoryId = null;
   }
 });
 
@@ -77,6 +93,47 @@ const filteredCommunityModels = computed(() => {
     (m.userNickname && m.userNickname.toLowerCase().includes(query))
   );
 });
+
+const checkOngoingGeneration = async () => {
+  try {
+    const response = await api.generation.getOngoingGeneration();
+
+    if (response.data && response.data.id) {
+      // 진행 중인 작업이 있음
+      console.log('🔄 진행 중인 작업 발견:', response.data);
+
+      currentHistoryId = response.data.id;
+      isGenerating.value = true;
+
+      // 초기 상태: 모델 불러오는 중 (SSE에서 진행률 오기 전)
+      currentStep.value = 0;
+      totalSteps.value = 0;
+      statusMessage.value = '모델 불러오는 중...';
+
+      // 모델 정보 복원
+      if (response.data.modelId) {
+        await selectModelById(response.data.modelId);
+      }
+
+      // 프롬프트 정보 복원
+      prompt.value = response.data.prompt || '';
+      negativePrompt.value = response.data.negativePrompt || '';
+      steps.value = response.data.steps || 30;
+      guidanceScale.value = response.data.guidanceScale || 7.5;
+      numImages.value = response.data.numImages || 1;
+      seed.value = response.data.seed;
+
+      // SSE 재연결
+      connectToProgressStream();
+
+      console.log('✅ SSE 재연결 완료. historyId:', currentHistoryId);
+    } else {
+      console.log('✅ 진행 중인 작업 없음');
+    }
+  } catch (err) {
+    console.error('❌ 진행 중인 작업 확인 실패:', err);
+  }
+};
 
 const loadModels = async () => {
   isLoadingModels.value = true;
@@ -161,12 +218,21 @@ const startGeneration = async () => {
     return;
   }
 
+  // 이미 진행 중인 작업이 있으면 무시 (UI는 진행 중 상태 유지)
+  if (isGenerating.value) {
+    console.log('⚠️ 이미 진행 중인 작업이 있습니다. 요청 무시.');
+    return;
+  }
+
   try {
     isGenerating.value = true;
     error.value = '';
     generatedImages.value = [];
+
+    // 초기 상태: 모델 불러오는 중 (SSE에서 진행률 오기 전)
     currentStep.value = 0;
-    totalSteps.value = steps.value;
+    totalSteps.value = 0;
+    statusMessage.value = '모델 불러오는 중...';
 
     // Prepare payload - only include defined values
     const payload: Record<string, unknown> = {
@@ -195,7 +261,13 @@ const startGeneration = async () => {
     const response = await api.generation.generateImage(payload as any);
     console.log('Generation response:', response);
 
-    statusMessage.value = 'Generation started...';
+    // historyId 저장 (SSE 이벤트 필터링용)
+    if (response.data && response.data.historyId) {
+      currentHistoryId = response.data.historyId as number;
+      console.log('📝 Generation started. historyId:', currentHistoryId);
+    }
+
+    // 상태 메시지는 "모델 불러오는 중..."으로 유지 (SSE에서 업데이트됨)
     connectToProgressStream();
   } catch (err) {
     console.error('Generation error:', err);
@@ -211,38 +283,61 @@ const startGeneration = async () => {
 const connectToProgressStream = () => {
   if (eventSource) eventSource.close();
   eventSource = api.generation.streamGenerationProgress((data: GenerationProgressResponse) => {
-    console.log('SSE 이벤트 수신:', data);
+    console.log('📨 SSE 이벤트 수신:', data);
 
     if (data.status === 'IN_PROGRESS') {
-      // FastAPI 진행률 업데이트
-      currentStep.value = data.current_step || 0;
-      totalSteps.value = data.total_steps || steps.value;
+      // FastAPI 진행률 업데이트 (모든 생성 작업에 대한 진행률이 올 수 있음)
+      const newStep = data.current_step || 0;
+      const newTotalSteps = data.total_steps || 0;
+
+      // 첫 진행률이 올 때 totalSteps 설정
+      if (totalSteps.value === 0 && newTotalSteps > 0) {
+        totalSteps.value = newTotalSteps;
+        console.log('🎯 Total steps 설정:', newTotalSteps);
+      }
+
+      currentStep.value = newStep;
       statusMessage.value = data.message || 'Generating...';
     } else if (data.status === 'SUCCESS') {
       // 백엔드 완료 이벤트 (이미지 URL 포함)
+      // 현재 생성 요청의 historyId와 일치하는지 확인
+      if (data.historyId && currentHistoryId && data.historyId !== currentHistoryId) {
+        console.log('⏭️ 다른 생성 요청의 완료 이벤트 (무시):', data.historyId);
+        return;
+      }
+
+      console.log('✅ 생성 완료!', data);
       isGenerating.value = false;
       statusMessage.value = 'Generation completed!';
 
       // generatedImages 배열에서 s3Url 추출
       if (data.generatedImages && Array.isArray(data.generatedImages)) {
         generatedImages.value = data.generatedImages.map((img: any) => img.s3Url);
-        console.log('생성된 이미지 URLs:', generatedImages.value);
+        console.log('🖼️ 생성된 이미지 URLs:', generatedImages.value);
       } else {
-        console.warn('생성된 이미지가 없습니다:', data);
+        console.warn('⚠️ 생성된 이미지가 없습니다:', data);
       }
 
       if (eventSource) {
         eventSource.close();
         eventSource = null;
       }
+      currentHistoryId = null;
     } else if (data.status === 'FAILED') {
       // 생성 실패
+      if (data.historyId && currentHistoryId && data.historyId !== currentHistoryId) {
+        console.log('⏭️ 다른 생성 요청의 실패 이벤트 (무시):', data.historyId);
+        return;
+      }
+
+      console.error('❌ 생성 실패:', data.message);
       isGenerating.value = false;
       error.value = data.message || 'Generation failed';
       if (eventSource) {
         eventSource.close();
         eventSource = null;
       }
+      currentHistoryId = null;
     }
   });
 };
@@ -347,9 +442,9 @@ onUnmounted(() => {
               <div v-if="isGenerating" class="mt-lg">
                 <div class="flex justify-between mb-sm">
                   <span class="text-sm text-secondary">{{ statusMessage }}</span>
-                  <span class="text-sm font-semibold">{{ currentStep }} / {{ totalSteps }}</span>
+                  <span v-if="totalSteps > 0" class="text-sm font-semibold">{{ currentStep }} / {{ totalSteps }}</span>
                 </div>
-                <div class="progress-bar">
+                <div v-if="totalSteps > 0" class="progress-bar">
                   <div class="progress-fill" :style="{ width: `${(currentStep / totalSteps) * 100}%` }"></div>
                 </div>
               </div>

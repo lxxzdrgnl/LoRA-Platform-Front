@@ -144,6 +144,21 @@ export interface GeneratedImageResponse {
   isSample: boolean;
 }
 
+export interface GenerationHistoryResponse {
+  id: number;
+  modelId: number;
+  modelTitle: string;
+  userId: number;
+  prompt: string;
+  negativePrompt?: string;
+  steps?: number;
+  guidanceScale?: number;
+  seed?: number;
+  numImages: number;
+  generatedImages: GeneratedImageResponse[];
+  createdAt: string;
+}
+
 export interface GenerationProgressResponse {
   status: string; // IN_PROGRESS, SUCCESS, FAILED
   current_step?: number;
@@ -586,6 +601,13 @@ export const api = {
 
   // ========== Generation ==========
   generation: {
+    async getOngoingGeneration(): Promise<ApiResponse<GenerationHistoryResponse | null>> {
+      const response = await fetch(`${API_BASE_URL}/api/generate/ongoing`, {
+        headers: getAuthHeaders(),
+      });
+      return handleResponse(response);
+    },
+
     async generateImage(data: {
       modelId: number;
       prompt: string;
@@ -614,10 +636,32 @@ export const api = {
     },
 
     streamGenerationProgress(onMessage: (data: GenerationProgressResponse) => void): EventSource {
-      const eventSource = new EventSource(`${API_BASE_URL}/api/generate/stream`);
-      eventSource.onmessage = (event) => {
-        onMessage(JSON.parse(event.data));
+      const url = `${API_BASE_URL}/api/generate/stream`;
+      console.log('🔌 SSE 연결 시도:', url);
+
+      const eventSource = new EventSource(url);
+
+      eventSource.onopen = () => {
+        console.log('✅ SSE 연결 성공');
       };
+
+      eventSource.onmessage = (event) => {
+        console.log('📨 SSE 메시지 수신:', event.data);
+        try {
+          const data = JSON.parse(event.data);
+          console.log('📦 파싱된 데이터:', data);
+          onMessage(data);
+        } catch (err) {
+          console.error('❌ SSE 데이터 파싱 실패:', err, event.data);
+        }
+      };
+
+      eventSource.onerror = (error) => {
+        console.error('❌ SSE 연결 오류:', error);
+        console.error('ReadyState:', eventSource.readyState);
+        // 0: CONNECTING, 1: OPEN, 2: CLOSED
+      };
+
       return eventSource;
     },
   },
