@@ -211,19 +211,32 @@ const startGeneration = async () => {
 const connectToProgressStream = () => {
   if (eventSource) eventSource.close();
   eventSource = api.generation.streamGenerationProgress((data: GenerationProgressResponse) => {
+    console.log('SSE 이벤트 수신:', data);
+
     if (data.status === 'IN_PROGRESS') {
+      // FastAPI 진행률 업데이트
       currentStep.value = data.current_step || 0;
       totalSteps.value = data.total_steps || steps.value;
       statusMessage.value = data.message || 'Generating...';
     } else if (data.status === 'SUCCESS') {
+      // 백엔드 완료 이벤트 (이미지 URL 포함)
       isGenerating.value = false;
-      generatedImages.value = data.image_urls || [];
       statusMessage.value = 'Generation completed!';
+
+      // generatedImages 배열에서 s3Url 추출
+      if (data.generatedImages && Array.isArray(data.generatedImages)) {
+        generatedImages.value = data.generatedImages.map((img: any) => img.s3Url);
+        console.log('생성된 이미지 URLs:', generatedImages.value);
+      } else {
+        console.warn('생성된 이미지가 없습니다:', data);
+      }
+
       if (eventSource) {
         eventSource.close();
         eventSource = null;
       }
     } else if (data.status === 'FAILED') {
+      // 생성 실패
       isGenerating.value = false;
       error.value = data.message || 'Generation failed';
       if (eventSource) {
