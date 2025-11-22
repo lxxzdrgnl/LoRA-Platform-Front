@@ -136,13 +136,26 @@ export interface TrainConfig {
   isPublic?: boolean;
 }
 
+export interface GeneratedImageResponse {
+  id: number;
+  s3Url: string;
+  s3Key: string;
+  displayOrder: number;
+  isSample: boolean;
+}
+
 export interface GenerationProgressResponse {
-  status: string; // Added status property
-  current_step: number;
-  total_steps: number;
-  message: string;
-  image_urls: string[];
+  status: string; // IN_PROGRESS, SUCCESS, FAILED
+  current_step?: number;
+  total_steps?: number;
+  message?: string;
+  image_urls?: string[];
   error?: string;
+  // SUCCESS 이벤트에서 추가로 포함되는 필드
+  historyId?: number;
+  modelId?: number;
+  userId?: number;
+  generatedImages?: GeneratedImageResponse[];
 }
 
 // ========== Auth Helper ==========
