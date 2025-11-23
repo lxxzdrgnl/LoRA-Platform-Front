@@ -93,15 +93,6 @@ const handleLogout = async () => {
   showUserMenu.value = false;
   window.location.href = '/';
 };
-
-const handleTrainingClick = (event: Event) => {
-  event.preventDefault();
-  showMobileMenu.value = false;
-
-  if (!authStore.requireAuth()) return;
-
-  router.push('/training');
-};
 </script>
 
 <template>
@@ -118,13 +109,11 @@ const handleTrainingClick = (event: Event) => {
         <!-- Navigation Links (Desktop) -->
         <div class="nav-links flex items-center gap-lg">
           <router-link to="/" class="nav-link">Explore</router-link>
-          <a href="/training" class="nav-link" @click="handleTrainingClick">Training</a>
+          <router-link to="/training" class="nav-link">Training</router-link>
         </div>
 
         <!-- User Section -->
         <div class="nav-user flex items-center gap-xs">
-          <ThemeToggle />
-
           <!-- Desktop User Menu -->
           <template v-if="isLoggedIn && user">
             <div class="user-menu">
@@ -135,6 +124,9 @@ const handleTrainingClick = (event: Event) => {
                   class="avatar"
                 />
                 <span class="text-primary font-semibold">{{ user.nickname }}</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="transition-transform" :style="{ transform: showUserMenu ? 'rotate(180deg)' : 'rotate(0deg)' }">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
               </div>
 
               <!-- Dropdown Menu -->
@@ -193,9 +185,8 @@ const handleTrainingClick = (event: Event) => {
           <button @click="handleLogin" class="btn btn-primary w-full">
             Login with Google
           </button>
+          <div class="divider"></div>
         </template>
-
-        <div class="divider"></div>
 
         <div class="mobile-menu-bottom flex items-center justify-between">
           <span class="text-sm text-muted">Switch Theme</span>
@@ -236,20 +227,42 @@ const handleTrainingClick = (event: Event) => {
   justify-content: center;
 }
 
-.nav-link {
+/* --- Shared Link/Item Styles --- */
+.nav-link,
+.dropdown-item,
+.mobile-menu-item {
   color: var(--text-secondary);
   text-decoration: none;
   font-weight: 500;
   font-size: 16px;
-  padding: var(--space-sm) var(--space-md);
   border-radius: var(--radius-md);
   transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.nav-link, .dropdown-item {
+  padding: var(--space-sm) var(--space-md);
+}
+.mobile-menu-item {
+  padding: var(--space-md);
 }
 
 .nav-link:hover,
-.nav-link.router-link-active {
+.nav-link.router-link-active,
+.dropdown-item:hover,
+.mobile-menu-item:hover,
+.mobile-menu-item.router-link-active {
   color: var(--text-primary);
   background: var(--bg-hover);
+}
+/* --- End Shared --- */
+
+
+.dropdown-item, .mobile-menu-item {
+  background: transparent;
+  border: none;
+  text-align: left;
+  width: 100%;
 }
 
 .user-menu {
@@ -276,25 +289,7 @@ const handleTrainingClick = (event: Event) => {
   box-shadow: var(--shadow-lg);
   z-index: 1000;
   border: 1px solid var(--border);
-}
-
-.dropdown-item {
-  padding: var(--space-sm) var(--space-md);
-  color: var(--text-secondary);
-  text-decoration: none;
-  border-radius: var(--radius-md);
-  transition: all 0.2s ease;
-  background: transparent;
-  border: none;
-  text-align: left;
-  cursor: pointer;
-  font-size: 14px;
-  width: 100%;
-}
-
-.dropdown-item:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  border-radius: var(--radius-md); /* Unify rounding */
 }
 
 .divider {
@@ -314,7 +309,7 @@ const handleTrainingClick = (event: Event) => {
 
 .mobile-menu {
   position: fixed;
-  top: 56px;
+  top: 66px; /* Match new navbar height */
   left: 0;
   right: 0;
   margin: var(--space-md);
@@ -322,6 +317,7 @@ const handleTrainingClick = (event: Event) => {
   z-index: 999;
   max-height: calc(100vh - 100px);
   overflow-y: auto;
+  border-radius: var(--radius-md); /* Unify rounding */
 }
 
 .mobile-menu-content {
@@ -330,26 +326,6 @@ const handleTrainingClick = (event: Event) => {
   gap: var(--space-xs);
 }
 
-.mobile-menu-item {
-  padding: var(--space-md);
-  color: var(--text-secondary);
-  text-decoration: none;
-  border-radius: var(--radius-md);
-  transition: all 0.2s ease;
-  background: transparent;
-  border: none;
-  text-align: left;
-  cursor: pointer;
-  font-size: 16px;
-  width: 100%;
-  font-weight: 500;
-}
-
-.mobile-menu-item:hover,
-.mobile-menu-item.router-link-active {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
 
 @media (max-width: 768px) {
   .nav-links {
@@ -369,7 +345,7 @@ const handleTrainingClick = (event: Event) => {
   }
 
   .user-menu .flex span {
-    display: none;
+    /* display: none; */ /* Removed to make nickname visible on mobile */
   }
 
   .nav-user .btn-icon,
@@ -377,20 +353,21 @@ const handleTrainingClick = (event: Event) => {
     padding: var(--space-sm);
   }
 
-  /* Adjustments for thinner mobile navbar */
+  /* Adjustments for mobile navbar height */
   .navbar {
-    padding: var(--space-xs) 0;
+    padding: var(--space-sm) 0;
   }
 
   .nav-content {
-    height: 48px;
+    height: 50px;
   }
 
   .dropdown-menu {
     position: fixed;
-    top: 64px; /* Approx. navbar height (48px) + space */
-    left: var(--space-md);
-    right: var(--space-md);
+    top: 66px; /* Match new navbar height */
+    left: 0;
+    right: 0;
+    margin: var(--space-md); /* Match mobile-menu margin */
     min-width: unset;
     width: auto;
     z-index: 999;
