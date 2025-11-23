@@ -55,6 +55,11 @@ const router = createRouter({
       name: 'favorites',
       component: Profile,
     },
+    {
+      path: '/generate-history',
+      name: 'generate-history',
+      component: Profile,
+    },
   ],
 });
 

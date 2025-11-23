@@ -145,7 +145,7 @@ const handleTrainingClick = (event: Event) => {
                 <router-link to="/favorites" class="dropdown-item">
                   <span>Favorites</span>
                 </router-link>
-                <router-link to="/profile?tab=history" class="dropdown-item">
+                <router-link to="/generate-history" class="dropdown-item">
                   <span>Generate History</span>
                 </router-link>
                 <div class="divider"></div>
@@ -179,17 +179,8 @@ const handleTrainingClick = (event: Event) => {
         <router-link to="/" class="mobile-menu-item" @click="showMobileMenu = false">
           Explore
         </router-link>
-        <a href="/training" class="mobile-menu-item" @click="handleTrainingClick">
+        <router-link to="/training" class="mobile-menu-item" @click="showMobileMenu = false">
           Training
-        </a>
-        <router-link to="/my-models" class="mobile-menu-item" @click="showMobileMenu = false">
-          My Models
-        </router-link>
-        <router-link to="/favorites" class="mobile-menu-item" @click="showMobileMenu = false">
-          Favorites
-        </router-link>
-        <router-link to="/profile?tab=history" class="mobile-menu-item" @click="showMobileMenu = false">
-          Generate History
         </router-link>
 
         <div class="divider"></div>
@@ -392,7 +383,17 @@ const handleTrainingClick = (event: Event) => {
   }
 
   .nav-content {
-    height: 40px;
+    height: 48px;
+  }
+
+  .dropdown-menu {
+    position: fixed;
+    top: 64px; /* Approx. navbar height (48px) + space */
+    left: var(--space-md);
+    right: var(--space-md);
+    min-width: unset;
+    width: auto;
+    z-index: 999;
   }
 }
 </style>

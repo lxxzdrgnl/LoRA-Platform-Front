@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import ModelCard from '../components/ModelCard.vue';
 import ModelDetailModal from '../components/ModelDetailModal.vue';
@@ -36,9 +36,9 @@ const refreshAllModels = () => {
 
 // Set initial tab based on route
 const getInitialTab = () => {
-  if (route.query.tab === 'history') return 'history';
   if (route.path === '/my-models') return 'models';
   if (route.path === '/favorites') return 'favorites';
+  if (route.path === '/generate-history') return 'history';
   return 'models'; // default to models for /profile or if no specific tab is set
 };
 
@@ -50,6 +50,14 @@ const favoriteModels = ref<LoraModel[]>([]);
 const likedModels = ref<LoraModel[]>([]);
 const generationHistory = ref<any[]>([]);
 const trainingHistory = ref<any[]>([]);
+
+// Watch for route changes to update the active tab
+watch(
+  () => route.fullPath,
+  () => {
+    activeTab.value = getInitialTab();
+  }
+);
 
 onMounted(async () => {
   // Check if user is logged in
