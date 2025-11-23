@@ -2,8 +2,6 @@
 
 > 만화/웹툰 캐릭터 LoRA 모델 학습, 생성, 공유를 위한 커뮤니티 플랫폼의 프론트엔드입니다.
 
-**배포 주소:** [http://blueming-front.s3-website.ap-northeast-2.amazonaws.com/](http://blueming-front.s3-website.ap-northeast-2.amazonaws.com/)
-
 ![LoRA Platform Screenshot](./choan.png)
 ![LoRA Platform Screenshot](./choan2.png)
 
@@ -31,6 +29,14 @@
 
 ---
 
+### 주요 링크
+- **프론트엔드 배포 링크**: http://blueming-front.s3-website.ap-northeast-2.amazonaws.com/
+- **백엔드 API 기본 URL**: http://bluemingai.ap-northeast-2.elasticbeanstalk.com/
+- **백엔드 API 문서 (Swagger UI)**: http://bluemingai.ap-northeast-2.elasticbeanstalk.com/swagger-ui/index.html
+- **백엔드 Github**: https://github.com/lxxzdrgnl/Lora-community
+- **AI서버 Github** : https://github.com/lxxzdrgnl/Lora-training-api
+
+---
 ## 시스템 아키텍처 및 프로젝트 구조
 
 ### 시스템 아키텍처

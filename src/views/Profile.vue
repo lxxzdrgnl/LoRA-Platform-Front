@@ -42,11 +42,13 @@ const getInitialTab = () => {
 };
 
 const activeTab = ref<'models' | 'favorites' | 'history'>(getInitialTab());
+const historySubTab = ref<'generate' | 'training'>('generate');
 const loading = ref(true);
 const myModels = ref<LoraModel[]>([]);
 const favoriteModels = ref<LoraModel[]>([]);
 const likedModels = ref<LoraModel[]>([]);
 const generationHistory = ref<any[]>([]);
+const trainingHistory = ref<any[]>([]);
 
 onMounted(async () => {
   // Check if user is logged in
@@ -60,6 +62,7 @@ onMounted(async () => {
   await loadFavoriteModels();
   await loadLikedModels();
   await loadGenerationHistory();
+  await loadTrainingHistory();
 });
 
 const loadUserProfile = async () => {
@@ -113,6 +116,15 @@ const loadGenerationHistory = async () => {
     generationHistory.value = response.data.content;
   } catch (error) {
     console.error('Failed to load generation history:', error);
+  }
+};
+
+const loadTrainingHistory = async () => {
+  try {
+    const response = await api.training.getMyTrainingJobs();
+    trainingHistory.value = response.data;
+  } catch (error) {
+    console.error('Failed to load training history:', error);
   }
 };
 
@@ -327,25 +339,124 @@ const saveProfile = async () => {
           </div>
         </div>
 
-        <!-- Generation History Tab -->
+        <!-- History Tab -->
         <div v-if="activeTab === 'history'">
-          <div v-if="generationHistory.length" class="grid grid-cols-4 gap-lg">
-            <div v-for="item in generationHistory" :key="item.id" class="card p-0 overflow-hidden">
-              <img
-                v-if="item.imageUrl"
-                :src="item.imageUrl"
-                alt="Generated"
-                class="w-full"
-                style="aspect-ratio: 1; object-fit: cover;"
-              />
-              <div class="p-md">
-                <p class="text-sm text-muted mb-xs">{{ new Date(item.createdAt).toLocaleString() }}</p>
-                <p class="text-sm truncate">{{ item.prompt }}</p>
+          <!-- History Sub-tabs -->
+          <div class="history-subtabs mb-lg">
+            <button
+              class="subtab-btn"
+              :class="{ active: historySubTab === 'generate' }"
+              @click="historySubTab = 'generate'"
+            >
+              Generation History
+            </button>
+            <button
+              class="subtab-btn"
+              :class="{ active: historySubTab === 'training' }"
+              @click="historySubTab = 'training'"
+            >
+              Training History
+            </button>
+          </div>
+
+          <!-- Generation History -->
+          <div v-if="historySubTab === 'generate'">
+            <div v-if="generationHistory.length" class="grid grid-cols-4 gap-lg">
+              <div v-for="item in generationHistory" :key="item.id" class="card p-0 overflow-hidden relative transition-transform duration-300 hover:translate-y-[-4px] hover:shadow-lg">
+                <!-- Status Badge -->
+                <div v-if="item.status === 'GENERATING'" class="absolute z-10 flex items-center gap-sm px-sm py-xs rounded badge-primary text-white" style="top: var(--space-sm); right: var(--space-sm); backdrop-filter: blur(4px);">
+                  <div class="loading"></div>
+                  <span class="text-xs">생성 중</span>
+                  <span v-if="item.currentStep && item.totalSteps" class="text-xs opacity-75">
+                    {{ item.currentStep }}/{{ item.totalSteps }}
+                  </span>
+                </div>
+                <div v-else-if="item.status === 'FAILED'" class="absolute z-10 badge badge-error text-white" style="top: var(--space-sm); right: var(--space-sm); backdrop-filter: blur(4px);">
+                  생성 실패
+                </div>
+
+                <!-- Generated Images -->
+                <div v-if="item.generatedImages && item.generatedImages.length > 0" class="relative">
+                  <img
+                    :src="item.generatedImages[0].s3Url"
+                    alt="Generated"
+                    class="w-full aspect-square object-cover"
+                  />
+                  <div v-if="item.generatedImages.length > 1" class="absolute badge text-white" style="bottom: var(--space-sm); right: var(--space-sm); background: rgba(0, 0, 0, 0.7);">
+                    +{{ item.generatedImages.length - 1 }}
+                  </div>
+                </div>
+                <div v-else class="w-full aspect-square flex items-center justify-center" style="background: var(--bg-hover);">
+                  <p class="text-sm text-muted text-center">
+                    <span v-if="item.status === 'GENERATING'">이미지 생성 중...</span>
+                    <span v-else>이미지 없음</span>
+                  </p>
+                </div>
+
+                <!-- Info -->
+                <div class="p-md">
+                  <p class="text-sm text-muted mb-xs">{{ new Date(item.createdAt).toLocaleString() }}</p>
+                  <p class="text-sm font-semibold mb-xs truncate">{{ item.modelTitle || 'Unknown Model' }}</p>
+                  <p class="text-sm truncate text-secondary">{{ item.prompt }}</p>
+                </div>
               </div>
             </div>
+            <div v-else class="card text-center p-xl">
+              <p class="text-secondary text-lg">생성 기록이 없습니다</p>
+            </div>
           </div>
-          <div v-else class="card text-center p-xl">
-            <p class="text-secondary text-lg">No generation history yet</p>
+
+          <!-- Training History -->
+          <div v-if="historySubTab === 'training'">
+            <div v-if="trainingHistory.length" class="grid grid-cols-1 gap-md">
+              <div v-for="job in trainingHistory" :key="job.id" class="card p-lg">
+                <div class="flex items-center justify-between mb-md">
+                  <div>
+                    <h3 class="text-lg font-bold">Training Job #{{ job.id }}</h3>
+                    <p class="text-sm text-muted">{{ new Date(job.createdAt).toLocaleString() }}</p>
+                  </div>
+                  <span
+                    class="badge text-xs font-semibold"
+                    :class="{
+                      'badge-success': job.status === 'COMPLETED',
+                      'badge-primary': job.status === 'TRAINING' || job.status === 'IN_PROGRESS',
+                      'badge-error': job.status === 'FAILED',
+                      'badge-secondary': job.status === 'PENDING'
+                    }"
+                  >
+                    {{ job.status }}
+                  </span>
+                </div>
+
+                <!-- Progress Bar -->
+                <div v-if="job.status === 'TRAINING' || job.status === 'IN_PROGRESS'" class="mb-md">
+                  <div class="w-full rounded-full overflow-hidden" style="height: 8px; background: var(--bg-hover);">
+                    <div
+                      class="h-full transition-all duration-300"
+                      style="background: linear-gradient(90deg, var(--primary), var(--primary-dark));"
+                      :style="{ width: `${(job.currentEpoch / job.totalEpochs) * 100}%` }"
+                    ></div>
+                  </div>
+                  <p class="text-sm text-center mt-xs text-secondary">
+                    Epoch {{ job.currentEpoch }} / {{ job.totalEpochs }}
+                    <span v-if="job.phase" class="text-muted"> - {{ job.phase }}</span>
+                  </p>
+                </div>
+
+                <!-- Completed Info -->
+                <div v-if="job.status === 'COMPLETED' && job.completedAt" class="text-sm text-secondary">
+                  완료: {{ new Date(job.completedAt).toLocaleString() }}
+                </div>
+
+                <!-- Error Message -->
+                <div v-if="job.status === 'FAILED' && job.errorMessage" class="p-sm rounded text-sm text-error" style="background: rgba(239, 68, 68, 0.1); border-left: 3px solid var(--error);">
+                  {{ job.errorMessage }}
+                </div>
+              </div>
+            </div>
+            <div v-else class="card text-center p-xl">
+              <p class="text-secondary text-lg">학습 기록이 없습니다</p>
+            </div>
           </div>
         </div>
       </div>
@@ -360,13 +471,11 @@ const saveProfile = async () => {
 </template>
 
 <style scoped>
-/* Profile-specific styles using main.css classes */
+/* Profile-specific styles - using main.css utility classes where possible */
 .profile-avatar {
   width: 120px;
   height: 120px;
 }
-
-
 
 .tabs-container {
   display: flex;
@@ -414,6 +523,41 @@ const saveProfile = async () => {
   color: var(--text-muted);
 }
 
+/* History Sub-tabs */
+.history-subtabs {
+  display: flex;
+  gap: var(--space-sm);
+  border-bottom: 2px solid var(--border);
+  margin-bottom: var(--space-lg);
+}
+
+.subtab-btn {
+  padding: var(--space-sm) var(--space-md);
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.3s ease;
+}
+
+.subtab-btn:hover {
+  color: var(--text-primary);
+}
+
+.subtab-btn.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+/* Hover effect utility */
+.hover\:translate-y-\[-4px\]:hover {
+  transform: translateY(-4px);
+}
+
 @media (max-width: 768px) {
   .tabs-container {
     overflow-x: auto;
@@ -423,6 +567,5 @@ const saveProfile = async () => {
     white-space: nowrap;
     padding: var(--space-md) var(--space-xs);
   }
-  
 }
 </style>
