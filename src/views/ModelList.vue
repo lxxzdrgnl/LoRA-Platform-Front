@@ -112,8 +112,6 @@ const clearSearch = () => {
 };
 
 const openGenerateModal = (modelId: number | null = null) => {
-  if (!authStore.requireAuth()) return;
-
   selectedModelId.value = modelId;
   showGenerateModal.value = true;
 };

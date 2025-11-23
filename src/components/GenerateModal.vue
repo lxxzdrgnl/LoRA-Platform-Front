@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
-import { api, type LoraModel, type GenerationProgressResponse } from '../services/api';
+import { api, authStore, type LoraModel, type GenerationProgressResponse } from '../services/api';
 
 const props = defineProps<{
   show: boolean;
@@ -208,6 +208,8 @@ const selectModelById = async (modelId: number) => {
 };
 
 const startGeneration = async () => {
+  if (!authStore.requireAuth()) return; // Added auth check
+
   if (!selectedModel.value) {
     error.value = 'Please select a model first';
     return;
@@ -273,7 +275,7 @@ const startGeneration = async () => {
   } catch (err) {
     console.error('Generation error:', err);
     if (err instanceof Error) {
-      error.value = `생성 실패: ${err.message}`;
+      error.value = `생성 실패: ${err instanceof Error ? err.message : 'Unknown error'}`;
     } else {
       error.value = '이미지 생성을 시작할 수 없습니다.';
     }
@@ -457,7 +459,7 @@ onUnmounted(() => {
       <div class="modal-body-content hide-scrollbar">
         <div class="grid grid-cols-2 gap-xl">
           <!-- Left: Configuration -->
-          <div class="config-section">
+          <div class="config-section" @focusin="authStore.requireAuth()">
             <div class="card">
               <h2 class="text-2xl font-bold mb-lg gradient-text">Configuration</h2>
 

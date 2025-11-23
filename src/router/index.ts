@@ -29,7 +29,6 @@ const router = createRouter({
       path: '/training',
       name: 'training',
       component: Training,
-      meta: { requiresAuth: true }, // Re-add meta field
     },
     {
       path: '/login',
@@ -73,7 +72,7 @@ router.beforeEach((to, from, next) => {
     next({ name: 'home' });
   } else if (requiresAuth && !isAuthenticated) {
     // If route requires auth and user is not authenticated, redirect to login
-    alert('Please log in to continue');
+    alert('Login to continue');
     next({ name: 'login' });
   } else {
     next();

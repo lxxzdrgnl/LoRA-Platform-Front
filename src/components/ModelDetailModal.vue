@@ -120,8 +120,6 @@ const copyPrompt = (prompt: string) => {
 };
 
 const openGenerateModal = () => {
-  if (!authStore.requireAuth()) return;
-
   if (props.modelId) {
     emit('open-generate', props.modelId);
   }

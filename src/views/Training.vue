@@ -42,10 +42,10 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 let eventSource: EventSource | null = null;
 
 onMounted(async () => {
-  // 인증 체크
-  if (!authStore.requireAuth()) return;
-
-  await loadTrainingHistory();
+  // Allow unauthenticated users to view the page
+  if (authStore.isAuthenticated()) {
+    await loadTrainingHistory();
+  }
 });
 
 const toggleSection = (section: string) => {
@@ -107,6 +107,7 @@ const handleDrop = (event: DragEvent) => {
 
 // Add files with validation
 const addFiles = (files: File[]) => {
+  if (!authStore.requireAuth()) return;
   uploadError.value = '';
 
   for (const file of files) {
@@ -134,6 +135,7 @@ const addFiles = (files: File[]) => {
 
 // Remove image
 const removeImage = (index: number) => {
+  if (!authStore.requireAuth()) return;
   selectedImages.value.splice(index, 1);
   imagePreviewUrls.value.splice(index, 1);
   trainingImagesCount.value = selectedImages.value.length;
@@ -179,6 +181,8 @@ const uploadImagesToS3 = async (): Promise<string[]> => {
 };
 
 const startTraining = async () => {
+  if (!authStore.requireAuth()) return;
+
   if (!title.value.trim()) {
     error.value = 'Please enter a model title';
     return;
@@ -344,7 +348,7 @@ onUnmounted(() => {
             <h2 class="text-3xl font-bold mb-lg gradient-text text-center">Training Configuration</h2>
 
             <!-- Accordion -->
-            <div class="accordion">
+            <div class="accordion" @focusin="authStore.requireAuth()">
               <!-- Section 1: Model Details -->
               <div class="accordion-item">
                 <div class="accordion-header" @click="toggleSection('model-details')">

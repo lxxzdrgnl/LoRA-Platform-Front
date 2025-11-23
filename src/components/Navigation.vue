@@ -201,7 +201,7 @@ const handleLogout = async () => {
 .navbar {
   background: rgba(var(--bg-card-rgb), 0.65);
   border-bottom: 1px solid var(--border);
-  padding: var(--space-md) 0;
+  padding: var(--space-md) 0; /* Reverted to original desktop padding */
   position: sticky;
   top: 0;
   z-index: 100;
@@ -210,7 +210,7 @@ const handleLogout = async () => {
 }
 
 .nav-content {
-  height: 60px;
+  height: 60px; /* Reverted to original desktop height */
 }
 
 .logo {
@@ -234,17 +234,11 @@ const handleLogout = async () => {
   color: var(--text-secondary);
   text-decoration: none;
   font-weight: 500;
-  font-size: 16px;
+  font-size: 14px;
   border-radius: var(--radius-md);
   transition: all 0.3s ease;
   cursor: pointer;
-}
-
-.nav-link, .dropdown-item {
-  padding: var(--space-sm) var(--space-md);
-}
-.mobile-menu-item {
-  padding: var(--space-md);
+  padding: 12px var(--space-md); /* Increased vertical padding */
 }
 
 .nav-link:hover,
@@ -282,14 +276,14 @@ const handleLogout = async () => {
   top: calc(100% + 12px);
   right: 0;
   min-width: 200px;
-  padding: var(--space-sm);
+  padding: var(--space-sm); /* Reverted to original desktop padding */
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
   box-shadow: var(--shadow-lg);
-  z-index: 1000;
+  z-index: 1000; /* Reverted to original desktop z-index */
   border: 1px solid var(--border);
-  border-radius: var(--radius-md); /* Unify rounding */
+  border-radius: var(--radius-md);
 }
 
 .divider {
@@ -309,15 +303,15 @@ const handleLogout = async () => {
 
 .mobile-menu {
   position: fixed;
-  top: 66px; /* Match new navbar height */
+  top: 66px; /* Based on mobile navbar height */
   left: 0;
   right: 0;
   margin: var(--space-md);
-  padding: var(--space-md);
+  padding: 12px;
   z-index: 999;
   max-height: calc(100vh - 100px);
   overflow-y: auto;
-  border-radius: var(--radius-md); /* Unify rounding */
+  border-radius: var(--radius-md);
 }
 
 .mobile-menu-content {
@@ -355,22 +349,25 @@ const handleLogout = async () => {
 
   /* Adjustments for mobile navbar height */
   .navbar {
-    padding: var(--space-sm) 0;
+    padding: var(--space-sm) 0; /* Apply thinner padding for mobile */
   }
 
   .nav-content {
-    height: 50px;
+    height: 50px; /* Apply thinner height for mobile */
   }
 
   .dropdown-menu {
     position: fixed;
-    top: 66px; /* Match new navbar height */
+    top: 66px; /* Match mobile navbar height */
     left: 0;
     right: 0;
-    margin: var(--space-md); /* Match mobile-menu margin */
+    margin: var(--space-md);
     min-width: unset;
     width: auto;
     z-index: 999;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+    padding: 12px; /* Apply 12px padding only on mobile */
   }
 }
 </style>

@@ -732,7 +732,7 @@ export const authStore = {
 
   requireAuth(): boolean {
     if (!this.isAuthenticated()) {
-      alert('Please log in to continue');
+      alert('Login to continue');
       const frontendUrl = import.meta.env.VITE_FRONTEND_URL || 'http://blueming-front.s3-website.ap-northeast-2.amazonaws.com';
       window.location.href = `${frontendUrl}/login`;
       return false;
