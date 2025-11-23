@@ -155,6 +155,10 @@ export interface GenerationHistoryResponse {
   guidanceScale?: number;
   seed?: number;
   numImages: number;
+  status: string; // GENERATING, SUCCESS, FAILED
+  currentStep?: number;
+  totalSteps?: number;
+  errorMessage?: string;
   generatedImages: GeneratedImageResponse[];
   createdAt: string;
 }
@@ -415,7 +419,7 @@ export const api = {
 
     async getFavoriteModels(page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
       const response = await fetch(
-        `${API_BASE_URL}/api/models/favorites?page=${page}&size=${size}`,
+        `${API_BASE_URL}/api/models/likes?page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
       return handleResponse(response);
@@ -635,6 +639,14 @@ export const api = {
       return handleResponse(response);
     },
 
+    async getGenerationHistory(historyId: number): Promise<ApiResponse<GenerationHistoryResponse>> {
+      const response = await fetch(
+        `${API_BASE_URL}/api/generate/history/${historyId}`,
+        { headers: { 'Content-Type': 'application/json' } } // 인증 없이 폴링 (백엔드에서 permitAll 설정됨)
+      );
+      return handleResponse(response);
+    },
+
     streamGenerationProgress(onMessage: (data: GenerationProgressResponse) => void): EventSource {
       const url = `${API_BASE_URL}/api/generate/stream`;
       console.log('🔌 SSE 연결 시도:', url);
@@ -716,5 +728,15 @@ export const authStore = {
 
   isAuthenticated(): boolean {
     return !!this.getAccessToken();
+  },
+
+  requireAuth(): boolean {
+    if (!this.isAuthenticated()) {
+      alert('Please log in to continue');
+      const frontendUrl = import.meta.env.VITE_FRONTEND_URL || 'http://blueming-front.s3-website.ap-northeast-2.amazonaws.com';
+      window.location.href = `${frontendUrl}/login`;
+      return false;
+    }
+    return true;
   },
 };

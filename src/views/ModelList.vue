@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue';
 import ModelCard from '../components/ModelCard.vue';
 import GenerateModal from '../components/GenerateModal.vue';
 import ModelDetailModal from '../components/ModelDetailModal.vue';
-import { api, type LoraModel, type TagResponse } from '../services/api';
+import { api, authStore, type LoraModel, type TagResponse } from '../services/api';
 
 interface LoraModelWithSize extends LoraModel {
   size?: 'large';
@@ -112,6 +112,8 @@ const clearSearch = () => {
 };
 
 const openGenerateModal = (modelId: number | null = null) => {
+  if (!authStore.requireAuth()) return;
+
   selectedModelId.value = modelId;
   showGenerateModal.value = true;
 };

@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
-import { api } from '../services/api';
+import { useRouter } from 'vue-router';
+import { api, authStore } from '../services/api';
 import { BookText, Images, BrainCircuit, ChevronDown } from 'lucide-vue-next';
+
+const router = useRouter();
 
 const openSections = ref<string[]>(['model-details']);
 
@@ -39,6 +42,9 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 let eventSource: EventSource | null = null;
 
 onMounted(async () => {
+  // 인증 체크
+  if (!authStore.requireAuth()) return;
+
   await loadTrainingHistory();
 });
 

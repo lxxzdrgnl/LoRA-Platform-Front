@@ -38,8 +38,10 @@ const currentStep = ref(0);
 const totalSteps = ref(0);
 const statusMessage = ref('');
 
-let eventSource: EventSource | null = null;
 let currentHistoryId: number | null = null;
+let websocket: WebSocket | null = null;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
 // Watch for the modal to open
 watch(() => props.show, async (newVal) => {
@@ -63,11 +65,8 @@ watch(() => props.show, async (newVal) => {
     // 진행 중인 작업 확인
     await checkOngoingGeneration();
   } else {
-    // 모달 닫을 때 SSE 연결 종료
-    if (eventSource) {
-      eventSource.close();
-      eventSource = null;
-    }
+    // 모달 닫을 때 WebSocket 종료
+    disconnectWebSocket();
     currentHistoryId = null;
   }
 });
@@ -105,9 +104,9 @@ const checkOngoingGeneration = async () => {
       currentHistoryId = response.data.id;
       isGenerating.value = true;
 
-      // 초기 상태: 모델 불러오는 중 (SSE에서 진행률 오기 전)
-      currentStep.value = 0;
-      totalSteps.value = 0;
+      // 초기 상태
+      currentStep.value = response.data.currentStep || 0;
+      totalSteps.value = response.data.totalSteps || 0;
       statusMessage.value = '모델 불러오는 중...';
 
       // 모델 정보 복원
@@ -123,10 +122,10 @@ const checkOngoingGeneration = async () => {
       numImages.value = response.data.numImages || 1;
       seed.value = response.data.seed;
 
-      // SSE 재연결
-      connectToProgressStream();
+      // WebSocket 연결
+      connectWebSocket();
 
-      console.log('✅ SSE 재연결 완료. historyId:', currentHistoryId);
+      console.log('✅ WebSocket 연결. historyId:', currentHistoryId);
     } else {
       console.log('✅ 진행 중인 작업 없음');
     }
@@ -261,14 +260,16 @@ const startGeneration = async () => {
     const response = await api.generation.generateImage(payload as any);
     console.log('Generation response:', response);
 
-    // historyId 저장 (SSE 이벤트 필터링용)
+    // historyId 저장
     if (response.data && response.data.historyId) {
       currentHistoryId = response.data.historyId as number;
       console.log('📝 Generation started. historyId:', currentHistoryId);
-    }
 
-    // 상태 메시지는 "모델 불러오는 중..."으로 유지 (SSE에서 업데이트됨)
-    connectToProgressStream();
+      // WebSocket 연결
+      connectWebSocket();
+    } else {
+      throw new Error('historyId를 받지 못했습니다');
+    }
   } catch (err) {
     console.error('Generation error:', err);
     if (err instanceof Error) {
@@ -280,66 +281,147 @@ const startGeneration = async () => {
   }
 };
 
-const connectToProgressStream = () => {
-  if (eventSource) eventSource.close();
-  eventSource = api.generation.streamGenerationProgress((data: GenerationProgressResponse) => {
-    console.log('📨 SSE 이벤트 수신:', data);
+// WebSocket 연결
+const connectWebSocket = () => {
+  if (websocket) {
+    websocket.close();
+  }
 
-    if (data.status === 'IN_PROGRESS') {
-      // FastAPI 진행률 업데이트 (모든 생성 작업에 대한 진행률이 올 수 있음)
-      const newStep = data.current_step || 0;
-      const newTotalSteps = data.total_steps || 0;
+  // 타이머 정리
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
 
-      // 첫 진행률이 올 때 totalSteps 설정
-      if (totalSteps.value === 0 && newTotalSteps > 0) {
-        totalSteps.value = newTotalSteps;
-        console.log('🎯 Total steps 설정:', newTotalSteps);
+  const userId = localStorage.getItem('userId') || '0';
+  const wsUrl = `ws://bluemingai.ap-northeast-2.elasticbeanstalk.com/ws/generation?userId=${userId}`;
+
+  console.log('🔌 WebSocket 연결 시도:', wsUrl);
+  statusMessage.value = '모델 불러오는 중...';
+
+  websocket = new WebSocket(wsUrl);
+
+  websocket.onopen = () => {
+    console.log('✅ WebSocket 연결 성공');
+
+    // Heartbeat 시작 (30초마다 ping 전송)
+    heartbeatTimer = setInterval(() => {
+      if (websocket && websocket.readyState === WebSocket.OPEN) {
+        try {
+          websocket.send(JSON.stringify({ type: 'ping' }));
+          console.log('💓 Heartbeat 전송');
+        } catch (err) {
+          console.error('❌ Heartbeat 전송 실패:', err);
+        }
       }
+    }, 30000); // 30초
+  };
 
-      currentStep.value = newStep;
-      statusMessage.value = data.message || 'Generating...';
-    } else if (data.status === 'SUCCESS') {
-      // 백엔드 완료 이벤트 (이미지 URL 포함)
-      // 현재 생성 요청의 historyId와 일치하는지 확인
-      if (data.historyId && currentHistoryId && data.historyId !== currentHistoryId) {
-        console.log('⏭️ 다른 생성 요청의 완료 이벤트 (무시):', data.historyId);
+  websocket.onmessage = (event) => {
+    console.log('📨 WebSocket 메시지:', event.data);
+
+    try {
+      const data = JSON.parse(event.data);
+      console.log('📦 파싱된 데이터:', data);
+
+      // Pong 메시지 무시
+      if (data.type === 'pong') {
+        console.log('💓 Pong 수신');
         return;
       }
 
-      console.log('✅ 생성 완료!', data);
-      isGenerating.value = false;
-      statusMessage.value = 'Generation completed!';
-
-      // generatedImages 배열에서 s3Url 추출
-      if (data.generatedImages && Array.isArray(data.generatedImages)) {
-        generatedImages.value = data.generatedImages.map((img: any) => img.s3Url);
-        console.log('🖼️ 생성된 이미지 URLs:', generatedImages.value);
-      } else {
-        console.warn('⚠️ 생성된 이미지가 없습니다:', data);
-      }
-
-      if (eventSource) {
-        eventSource.close();
-        eventSource = null;
-      }
-      currentHistoryId = null;
-    } else if (data.status === 'FAILED') {
-      // 생성 실패
-      if (data.historyId && currentHistoryId && data.historyId !== currentHistoryId) {
-        console.log('⏭️ 다른 생성 요청의 실패 이벤트 (무시):', data.historyId);
+      // historyId 필터링 (내 작업만 처리)
+      if (data.historyId !== currentHistoryId) {
+        console.log('⏭️ 다른 작업의 이벤트 무시:', data.historyId);
         return;
       }
 
-      console.error('❌ 생성 실패:', data.message);
-      isGenerating.value = false;
-      error.value = data.message || 'Generation failed';
-      if (eventSource) {
-        eventSource.close();
-        eventSource = null;
+      if (data.status === 'SUCCESS') {
+        console.log('✅ 생성 완료!', data);
+        isGenerating.value = false;
+        statusMessage.value = 'Generation completed!';
+
+        // S3 URLs 추출
+        if (data.generatedImages && Array.isArray(data.generatedImages)) {
+          generatedImages.value = data.generatedImages.map((img: any) => img.s3Url);
+          console.log('🖼️ 생성된 이미지 URLs:', generatedImages.value);
+        } else {
+          console.error('❌ generatedImages 없음:', data);
+          error.value = '이미지 생성은 완료되었으나 이미지를 찾을 수 없습니다.';
+        }
+
+        disconnectWebSocket();
+        currentHistoryId = null;
+      } else if (data.status === 'FAILED') {
+        console.error('❌ 생성 실패:', data.message);
+        isGenerating.value = false;
+        error.value = data.message || 'Generation failed';
+        disconnectWebSocket();
+        currentHistoryId = null;
+      } else if (data.status === 'GENERATING') {
+        // 진행률 업데이트
+        if (data.currentStep !== undefined && data.totalSteps !== undefined) {
+          currentStep.value = data.currentStep;
+          totalSteps.value = data.totalSteps;
+          statusMessage.value = `Generating... (${data.currentStep}/${data.totalSteps})`;
+          console.log(`📊 진행률: ${data.currentStep}/${data.totalSteps}`);
+        } else {
+          statusMessage.value = 'Generating...';
+          console.log('📊 상태: GENERATING (진행률 정보 없음)');
+        }
       }
-      currentHistoryId = null;
+    } catch (err) {
+      console.error('❌ WebSocket 메시지 파싱 실패:', err, event.data);
     }
-  });
+  };
+
+  websocket.onerror = (evt) => {
+    console.error('❌ WebSocket 에러:', evt);
+    error.value = 'WebSocket 연결 오류';
+  };
+
+  websocket.onclose = (event) => {
+    console.log('🔌 WebSocket 연결 종료:', event.code, event.reason);
+
+    // Heartbeat 타이머 정리
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+
+    // 진행 중인 작업이 있으면 5초 후 재연결
+    if (isGenerating.value && currentHistoryId !== null) {
+      console.log('🔄 5초 후 재연결 시도...');
+      reconnectTimer = setTimeout(() => {
+        console.log('🔄 재연결 시도');
+        connectWebSocket();
+      }, 5000);
+    }
+  };
+};
+
+const disconnectWebSocket = () => {
+  // 재연결 타이머 취소
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+
+  // Heartbeat 타이머 취소
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+
+  if (websocket) {
+    websocket.close();
+    websocket = null;
+    console.log('⏹️ WebSocket 종료');
+  }
 };
 
 const downloadImage = (url: string, index: number) => {
@@ -354,9 +436,8 @@ const closeModal = () => {
 };
 
 onUnmounted(() => {
-  if (eventSource) {
-    eventSource.close();
-  }
+  // 컴포넌트 언마운트 시 WebSocket 종료
+  disconnectWebSocket();
 });
 </script>
 

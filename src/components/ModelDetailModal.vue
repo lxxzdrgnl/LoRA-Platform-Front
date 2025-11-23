@@ -73,6 +73,8 @@ const fetchComments = async (id: number) => {
 };
 
 const toggleLike = async () => {
+  if (!authStore.requireAuth()) return;
+
   if (!props.modelId) return;
   try {
     await api.community.toggleLike(props.modelId);
@@ -85,6 +87,8 @@ const toggleLike = async () => {
 };
 
 const submitComment = async () => {
+  if (!authStore.requireAuth()) return;
+
   if (!newComment.value.trim() || !props.modelId) return;
   try {
     const response = await api.community.createComment(props.modelId, newComment.value);
@@ -96,6 +100,8 @@ const submitComment = async () => {
 };
 
 const toggleCommentLike = async (commentId: number) => {
+  if (!authStore.requireAuth()) return;
+
   if (!props.modelId) return;
   try {
     const response = await api.community.toggleCommentLike(props.modelId, commentId);
@@ -114,6 +120,8 @@ const copyPrompt = (prompt: string) => {
 };
 
 const openGenerateModal = () => {
+  if (!authStore.requireAuth()) return;
+
   if (props.modelId) {
     emit('open-generate', props.modelId);
   }

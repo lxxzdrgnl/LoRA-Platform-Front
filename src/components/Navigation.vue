@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { authStore, api, type UserResponse } from '../services/api';
 import ThemeToggle from './ThemeToggle.vue';
+
+const router = useRouter();
 
 const isLoggedIn = ref(false);
 const user = ref<UserResponse | null>(null);
@@ -90,6 +93,15 @@ const handleLogout = async () => {
   showUserMenu.value = false;
   window.location.href = '/';
 };
+
+const handleTrainingClick = (event: Event) => {
+  event.preventDefault();
+  showMobileMenu.value = false;
+
+  if (!authStore.requireAuth()) return;
+
+  router.push('/training');
+};
 </script>
 
 <template>
@@ -106,7 +118,7 @@ const handleLogout = async () => {
         <!-- Navigation Links (Desktop) -->
         <div class="nav-links flex items-center gap-lg">
           <router-link to="/" class="nav-link">Explore</router-link>
-          <router-link to="/training" class="nav-link">Training</router-link>
+          <a href="/training" class="nav-link" @click="handleTrainingClick">Training</a>
         </div>
 
         <!-- User Section -->
@@ -167,9 +179,9 @@ const handleLogout = async () => {
         <router-link to="/" class="mobile-menu-item" @click="showMobileMenu = false">
           Explore
         </router-link>
-        <router-link to="/training" class="mobile-menu-item" @click="showMobileMenu = false">
+        <a href="/training" class="mobile-menu-item" @click="handleTrainingClick">
           Training
-        </router-link>
+        </a>
 
         <div class="divider"></div>
 
