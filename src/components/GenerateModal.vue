@@ -467,7 +467,7 @@ onUnmounted(() => {
                 <button class="model-select-btn" @click="openModelModal" :disabled="isGenerating">
                   <span v-if="selectedModel" class="text-left flex-1">
                     <span class="font-semibold">{{ selectedModel.title }}</span>
-                    <span class="text-sm text-secondary block">by {{ selectedModel.userNickname }}</span>
+                    <span class="text-sm text-secondary block mt-xs">by {{ selectedModel.userNickname }}</span>
                   </span>
                   <span v-else class="text-secondary">Choose a model...</span>
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ml-sm">

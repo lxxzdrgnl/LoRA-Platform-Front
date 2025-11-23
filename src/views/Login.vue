@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { api } from '../services/api';
 
 const isLoading = ref(false);
 
 const handleGoogleLogin = () => {
   isLoading.value = true;
-  window.location.href = '/api/auth/google?prompt=select_account';
+  api.auth.googleLogin();
 };
 </script>
 
@@ -33,16 +34,6 @@ const handleGoogleLogin = () => {
               Continue with Google
             </template>
           </button>
-        </div>
-
-        <!-- Terms -->
-        <div class="text-center mt-xl">
-          <p class="text-xs text-muted">
-            By signing in, you agree to our
-            <a href="/terms" class="text-secondary">Terms of Service</a>
-            and
-            <a href="/privacy" class="text-secondary">Privacy Policy</a>
-          </p>
         </div>
       </div>
 

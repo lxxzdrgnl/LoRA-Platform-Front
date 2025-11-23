@@ -36,9 +36,10 @@ const refreshAllModels = () => {
 
 // Set initial tab based on route
 const getInitialTab = () => {
+  if (route.query.tab === 'history') return 'history';
   if (route.path === '/my-models') return 'models';
   if (route.path === '/favorites') return 'favorites';
-  return 'models'; // default to models for /profile
+  return 'models'; // default to models for /profile or if no specific tab is set
 };
 
 const activeTab = ref<'models' | 'favorites' | 'history'>(getInitialTab());

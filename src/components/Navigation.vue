@@ -139,14 +139,14 @@ const handleTrainingClick = (event: Event) => {
 
               <!-- Dropdown Menu -->
               <div v-if="showUserMenu" class="dropdown-menu card">
-                <router-link to="/profile" class="dropdown-item">
-                  <span>Profile</span>
-                </router-link>
                 <router-link to="/my-models" class="dropdown-item">
                   <span>My Models</span>
                 </router-link>
                 <router-link to="/favorites" class="dropdown-item">
                   <span>Favorites</span>
+                </router-link>
+                <router-link to="/profile?tab=history" class="dropdown-item">
+                  <span>Generate History</span>
                 </router-link>
                 <div class="divider"></div>
                 <button @click="handleLogout" class="dropdown-item">
@@ -182,12 +182,21 @@ const handleTrainingClick = (event: Event) => {
         <a href="/training" class="mobile-menu-item" @click="handleTrainingClick">
           Training
         </a>
+        <router-link to="/my-models" class="mobile-menu-item" @click="showMobileMenu = false">
+          My Models
+        </router-link>
+        <router-link to="/favorites" class="mobile-menu-item" @click="showMobileMenu = false">
+          Favorites
+        </router-link>
+        <router-link to="/profile?tab=history" class="mobile-menu-item" @click="showMobileMenu = false">
+          Generate History
+        </router-link>
 
         <div class="divider"></div>
 
         <!-- Mobile User Section -->
         <template v-if="isLoggedIn && user">
-          <!-- Logout button removed as per user request -->
+          <!-- Logout button is in dropdown, so nothing here -->
         </template>
         <template v-else>
           <button @click="handleLogin" class="btn btn-primary w-full">
@@ -314,7 +323,7 @@ const handleTrainingClick = (event: Event) => {
 
 .mobile-menu {
   position: fixed;
-  top: 76px;
+  top: 56px;
   left: 0;
   right: 0;
   margin: var(--space-md);
@@ -375,6 +384,15 @@ const handleTrainingClick = (event: Event) => {
   .nav-user .btn-icon,
   .nav-user .mobile-menu-btn {
     padding: var(--space-sm);
+  }
+
+  /* Adjustments for thinner mobile navbar */
+  .navbar {
+    padding: var(--space-xs) 0;
+  }
+
+  .nav-content {
+    height: 40px;
   }
 }
 </style>

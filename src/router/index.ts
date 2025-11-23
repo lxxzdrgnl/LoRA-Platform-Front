@@ -5,7 +5,7 @@ import AuthCallback from '../views/AuthCallback.vue';
 import Profile from '../views/Profile.vue';
 import Search from '../views/Search.vue';
 import Training from '../views/Training.vue';
-import GenerateDebug from '../views/GenerateDebug.vue';
+import { authStore } from '../services/api'; // Import authStore
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -55,12 +55,16 @@ const router = createRouter({
       name: 'favorites',
       component: Profile,
     },
-    {
-      path: '/debug/generate',
-      name: 'generate-debug',
-      component: GenerateDebug,
-    },
   ],
+});
+
+router.beforeEach((to, from, next) => {
+  if (to.name === 'login' && authStore.isAuthenticated()) {
+    // If authenticated user tries to access /login, redirect to home
+    next({ name: 'home' });
+  } else {
+    next();
+  }
 });
 
 export default router;
