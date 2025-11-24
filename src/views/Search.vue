@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import ModelCard from '../components/ModelCard.vue';
+import ModelCard from '../components/models/ModelCard.vue';
 import { api, type LoraModel, type SearchUserResponse, type SearchAllResponse } from '../services/api';
 
 const searchQuery = ref('');

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import JSZip from 'jszip';
-import { api } from '../services/api';
+import { api } from '../../services/api';
 
 const props = defineProps<{
   show: boolean;
@@ -56,115 +56,71 @@ const copyToClipboard = (text: string) => {
 }
 
 const downloadImage = async (imageUrl: string, historyId: number, imageId: number) => {
-
   try {
-
-    const response = await fetch(imageUrl);
+    const freshUrl = `${imageUrl}?time=${new Date().getTime()}`;
+    const response = await fetch(freshUrl, {
+      method: 'GET',
+      mode: 'cors',
+    });
 
     if (!response.ok) throw new Error('Network response was not ok.');
 
     const blob = await response.blob();
-
     const url = window.URL.createObjectURL(blob);
-
     const link = document.createElement('a');
-
     link.href = url;
-
     link.download = `blueming_ai_history_${historyId}_${imageId}.png`;
-
     document.body.appendChild(link);
-
     link.click();
-
     document.body.removeChild(link);
-
     window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('Download failed:', error);
+    alert(`Download failed: ${error}. This might be a CORS issue. Opening image in a new tab as a fallback.`);
+    window.open(imageUrl, '_blank');
+  }
+};
+
+const downloadAllAsZip = async () => {
+    if (!history.value || !history.value.generatedImages || history.value.generatedImages.length === 0) return;
+
+    isZipping.value = true;
+    try {
+        const zip = new JSZip();
+        
+        const imagePromises = history.value.generatedImages.map(async (image: any, index: number) => {
+            const freshUrl = `${image.s3Url}?time=${new Date().getTime()}`;
+            const response = await fetch(freshUrl, {
+                method: 'GET',
+                mode: 'cors',
+            });
+
+            if (!response.ok) {
+                console.error(`Failed to fetch image ${index + 1}`);
+                return;
+            }
+            const blob = await response.blob();
+            zip.file(`image_${index + 1}.png`, blob);
+        });
+
+        await Promise.all(imagePromises);
+
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(zipBlob);
+        link.download = `blueming_ai_history_${history.value.id}.zip`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
 
     } catch (error) {
-
-      console.error('Download failed:', error);
-
-      alert(`Download failed: ${error}. This might be a CORS issue. Opening image in a new tab as a fallback.`);
-
-      window.open(imageUrl, '_blank');
-
+        console.error('Failed to create zip file:', error);
+        alert(`Failed to create zip file: ${error}. This could be a CORS issue.`);
+    } finally {
+        isZipping.value = false;
     }
-
-  };
-
-  
-
-  const downloadAllAsZip = async () => {
-
-      if (!history.value || !history.value.generatedImages || history.value.generatedImages.length === 0) return;
-
-  
-
-      isZipping.value = true;
-
-      try {
-
-          const zip = new JSZip();
-
-          
-
-          const imagePromises = history.value.generatedImages.map(async (image: any, index: number) => {
-
-              const response = await fetch(image.s3Url);
-
-              if (!response.ok) {
-
-                  console.error(`Failed to fetch image ${index + 1}`);
-
-                  return;
-
-              }
-
-              const blob = await response.blob();
-
-              zip.file(`image_${index + 1}.png`, blob);
-
-          });
-
-  
-
-          await Promise.all(imagePromises);
-
-  
-
-          const zipBlob = await zip.generateAsync({ type: 'blob' });
-
-          
-
-          const link = document.createElement('a');
-
-          link.href = URL.createObjectURL(zipBlob);
-
-          link.download = `blueming_ai_history_${history.value.id}.zip`;
-
-          document.body.appendChild(link);
-
-          link.click();
-
-          document.body.removeChild(link);
-
-          URL.revokeObjectURL(link.href);
-
-  
-
-      } catch (error) {
-
-          console.error('Failed to create zip file:', error);
-
-          alert(`Failed to create zip file: ${error}. This could be a CORS issue.`);
-
-      } finally {
-
-          isZipping.value = false;
-
-      }
-
 };
 </script>
 
@@ -200,7 +156,7 @@ const downloadImage = async (imageUrl: string, historyId: number, imageId: numbe
                         </div>
                         <div class="images-grid" :class="{ 'single-image': history.generatedImages.length === 1 }">
                             <div v-for="image in history.generatedImages" :key="image.id" class="image-item">
-                                <img :src="image.s3Url" alt="Generated image" class="object-contain w-full h-full" crossorigin="anonymous"/>
+                                <img :src="image.s3Url" alt="Generated image" class="object-contain w-full h-full"/>
                                 <div class="image-actions">
                                     <button class="btn btn-secondary btn-sm flex-1" @click.stop="downloadImage(image.s3Url, history.id, image.id)">
                                         Download

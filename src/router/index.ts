@@ -5,7 +5,7 @@ import AuthCallback from '../views/AuthCallback.vue';
 import Profile from '../views/Profile.vue';
 import Search from '../views/Search.vue';
 import Training from '../views/Training.vue';
-import { authStore } from '../services/api'; // Import authStore
+import { useAuthStore } from '../stores/auth';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -64,8 +64,9 @@ const router = createRouter({
 });
 
 router.beforeEach((to, from, next) => {
+  const authStore = useAuthStore();
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
-  const isAuthenticated = authStore.isAuthenticated();
+  const isAuthenticated = authStore.isAuthenticated;
 
   if (to.name === 'login' && isAuthenticated) {
     // If authenticated user tries to access /login, redirect to home

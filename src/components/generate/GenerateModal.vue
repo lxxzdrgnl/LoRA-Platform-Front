@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
-import { api, authStore, getWebSocketUrl, type LoraModel, type GenerationProgressResponse } from '../services/api';
+import { useAuthStore } from '../../stores/auth';
+import { api, getWebSocketUrl, type LoraModel, type GenerationProgressResponse } from '../../services/api';
+
+const authStore = useAuthStore();
 
 const props = defineProps<{
   show: boolean;
@@ -432,7 +435,7 @@ const disconnectWebSocket = () => {
 };
 
 const handleAuthCheck = (event: FocusEvent) => {
-  if (!authStore.isAuthenticated()) {
+  if (!authStore.isAuthenticated) {
     (event.target as HTMLElement).blur();
     authStore.requireAuth();
   }

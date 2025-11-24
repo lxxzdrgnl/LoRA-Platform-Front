@@ -191,6 +191,7 @@ export interface GenerationProgressResponse {
 
 // ========== Auth Helper ==========
 const getAuthHeaders = (): HeadersInit => {
+  // Direct localStorage access to avoid circular dependency
   const token = localStorage.getItem('accessToken');
   return {
     'Content-Type': 'application/json',
@@ -727,7 +728,8 @@ export const api = {
   },
 };
 
-// ========== Auth Store ==========
+// ========== Legacy Auth Store Export (for backward compatibility) ==========
+// This is kept for backward compatibility. Please use useAuthStore from stores/auth.ts instead.
 export const authStore = {
   setTokens(accessToken: string, refreshToken: string): void {
     localStorage.setItem('accessToken', accessToken);

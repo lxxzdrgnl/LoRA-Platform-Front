@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { authStore } from '../services/api';
+import { useAuthStore } from '../stores/auth';
 
 const router = useRouter();
+const authStore = useAuthStore();
 
 onMounted(() => {
   // URL Fragment에서 토큰 정보 추출
@@ -19,6 +20,9 @@ onMounted(() => {
   const email = params.get('email');
   const name = params.get('name');
   const nickname = params.get('nickname');
+  const profileImageUrl = params.get('profileImageUrl');
+  const role = params.get('role');
+  const createdAt = params.get('createdAt');
 
   console.log('AuthCallback - accessToken:', accessToken ? 'exists' : 'missing');
   console.log('AuthCallback - refreshToken:', refreshToken ? 'exists' : 'missing');
@@ -28,15 +32,18 @@ onMounted(() => {
     authStore.setTokens(accessToken, refreshToken);
     console.log('AuthCallback - tokens saved to localStorage');
 
-    // 사용자 정보도 저장 (선택사항)
+    // 사용자 정보 저장
     if (userId && email && name && nickname) {
       const userData = {
         id: parseInt(userId),
         email: decodeURIComponent(email),
         name: decodeURIComponent(name),
         nickname: decodeURIComponent(nickname),
+        profileImageUrl: profileImageUrl ? decodeURIComponent(profileImageUrl) : '',
+        role: role || 'USER',
+        createdAt: createdAt || new Date().toISOString(),
       };
-      localStorage.setItem('user', JSON.stringify(userData));
+      authStore.setUser(userData);
       console.log('AuthCallback - user data saved:', userData);
     }
 

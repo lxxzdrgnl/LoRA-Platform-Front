@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { authStore, api, type UserResponse } from '../services/api';
+import { useAuthStore } from '../stores/auth';
+import { api, type UserResponse } from '../services/api';
 import ThemeToggle from './ThemeToggle.vue';
 
 const router = useRouter();
+const authStore = useAuthStore();
 
-const isLoggedIn = ref(false);
-const user = ref<UserResponse | null>(null);
+const user = ref<UserResponse | null>(authStore.user);
 const showUserMenu = ref(false);
 const showMobileMenu = ref(false);
+
+const isLoggedIn = computed(() => authStore.isAuthenticated);
 
 onMounted(async () => {
   await checkAuthStatus();
@@ -24,12 +27,18 @@ onUnmounted(() => {
 
 const checkAuthStatus = async () => {
   console.log('Navigation - checkAuthStatus called');
-  console.log('Navigation - isAuthenticated:', authStore.isAuthenticated());
+  console.log('Navigation - isAuthenticated:', authStore.isAuthenticated);
   console.log('Navigation - accessToken:', authStore.getAccessToken() ? 'exists' : 'missing');
 
-  if (!authStore.isAuthenticated()) {
+  if (!authStore.isAuthenticated) {
     console.log('Navigation - not authenticated');
-    isLoggedIn.value = false;
+    return;
+  }
+
+  // Use cached user from store if available
+  if (authStore.user) {
+    user.value = authStore.user;
+    console.log('Navigation - using cached user:', user.value.nickname);
     return;
   }
 
@@ -37,13 +46,12 @@ const checkAuthStatus = async () => {
     console.log('Navigation - fetching user profile');
     const response = await api.user.getMyProfile();
     user.value = response.data;
-    isLoggedIn.value = true;
+    authStore.setUser(response.data);
     console.log('Navigation - user profile loaded:', user.value.nickname);
   } catch (error) {
     console.error('Navigation - failed to get user profile:', error);
     // Token might be expired, clear it
     authStore.clearTokens();
-    isLoggedIn.value = false;
   }
 };
 
@@ -61,6 +69,7 @@ const handleProfileUpdate = (event: Event) => {
   const customEvent = event as CustomEvent;
   if (customEvent.detail) {
     user.value = customEvent.detail;
+    authStore.setUser(customEvent.detail);
     console.log('Navigation - profile updated:', user.value?.nickname);
   }
 };
@@ -88,7 +97,6 @@ const handleLogout = async () => {
   }
 
   authStore.clearTokens();
-  isLoggedIn.value = false;
   user.value = null;
   showUserMenu.value = false;
   window.location.href = '/';

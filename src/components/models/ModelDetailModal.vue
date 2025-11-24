@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue';
-import { api, authStore } from '../services/api';
+import { useAuthStore } from '../../stores/auth';
+import { api } from '../../services/api';
 import ModelDetailSkeleton from './ModelDetailSkeleton.vue';
+
+const authStore = useAuthStore();
 
 const props = defineProps<{
   show: boolean;
@@ -42,7 +45,7 @@ watch(() => props.modelId, async (newId) => {
 });
 
 const loadCurrentUser = async () => {
-  if (!authStore.isAuthenticated()) return;
+  if (!authStore.isAuthenticated) return;
   try {
     const response = await api.user.getMyProfile();
     currentUser.value = response.data;

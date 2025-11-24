@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import ModelCard from '../components/ModelCard.vue';
-import GenerateModal from '../components/GenerateModal.vue';
-import ModelDetailModal from '../components/ModelDetailModal.vue';
-import { api, authStore, type LoraModel, type TagResponse } from '../services/api';
+import { useAuthStore } from '../stores/auth';
+import ModelCard from '../components/models/ModelCard.vue';
+import GenerateModal from '../components/generate/GenerateModal.vue';
+import ModelDetailModal from '../components/models/ModelDetailModal.vue';
+import { api, type LoraModel, type TagResponse } from '../services/api';
+
+const authStore = useAuthStore();
 
 interface LoraModelWithSize extends LoraModel {
   size?: 'large';
