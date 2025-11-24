@@ -200,7 +200,7 @@ const downloadImage = async (imageUrl: string, historyId: number, imageId: numbe
                         </div>
                         <div class="images-grid" :class="{ 'single-image': history.generatedImages.length === 1 }">
                             <div v-for="image in history.generatedImages" :key="image.id" class="image-item">
-                                <img :src="image.s3Url" alt="Generated image" class="object-contain w-full h-full"/>
+                                <img :src="image.s3Url" alt="Generated image" class="object-contain w-full h-full" crossorigin="anonymous"/>
                                 <div class="image-actions">
                                     <button class="btn btn-secondary btn-sm flex-1" @click.stop="downloadImage(image.s3Url, history.id, image.id)">
                                         Download

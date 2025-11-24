@@ -152,6 +152,10 @@ const handleLogout = async () => {
             <button @click="handleLogin" class="btn btn-primary btn-sm desktop-login">Login with Google</button>
           </template>
 
+          <div class="hide-on-mobile">
+            <ThemeToggle />
+          </div>
+
           <!-- Mobile Menu Button -->
           <button class="mobile-menu-btn" @click="toggleMobileMenu">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -187,7 +191,6 @@ const handleLogout = async () => {
           </button>
           <div class="divider"></div>
         </template>
-
         <div class="mobile-menu-bottom flex items-center justify-between">
           <span class="text-sm text-muted">Switch Theme</span>
           <ThemeToggle />
@@ -320,8 +323,16 @@ const handleLogout = async () => {
   gap: var(--space-xs);
 }
 
+.hide-on-mobile {
+  display: block;
+}
+
 
 @media (max-width: 768px) {
+  .hide-on-mobile {
+    display: none;
+  }
+
   .nav-links {
     display: none;
   }

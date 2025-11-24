@@ -408,7 +408,8 @@ const saveProfile = async () => {
                     v-if="item.thumbnailUrl"
                     :src="item.thumbnailUrl"
                     alt="Generated"
-                    class="w-full h-full object-contain"
+                    class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 group-hover:brightness-75"
+                    crossorigin="anonymous"
                   />
                   <div v-else class="w-full h-full flex items-center justify-center text-muted">
                     <span>No Image</span>
@@ -591,6 +592,10 @@ const saveProfile = async () => {
 /* Hover effect utility */
 .hover\:translate-y-\[-4px\]:hover {
   transform: translateY(-4px);
+}
+
+.group:hover .group-hover\:brightness-75 {
+  filter: brightness(0.75);
 }
 
 @media (max-width: 768px) {
