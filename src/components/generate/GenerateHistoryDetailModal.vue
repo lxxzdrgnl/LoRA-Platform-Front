@@ -156,11 +156,15 @@ const downloadAllAsZip = async () => {
                         </div>
                         <div class="images-grid" :class="{ 'single-image': history.generatedImages.length === 1 }">
                             <div v-for="image in history.generatedImages" :key="image.id" class="image-item">
-                                <img :src="image.s3Url" alt="Generated image" class="object-contain w-full h-full"/>
-                                <div class="image-actions">
-                                    <button class="btn btn-secondary btn-sm flex-1" @click.stop="downloadImage(image.s3Url, history.id, image.id)">
-                                        Download
-                                    </button>
+                                <img :src="image.s3Url" alt="Generated image" class="img-cover"/>
+                                <div class="content-overlay">
+                                    <div class="overlay-top">
+                                    </div>
+                                    <div class="overlay-bottom">
+                                        <button class="btn btn-secondary btn-sm w-full" @click.stop="downloadImage(image.s3Url, history.id, image.id)">
+                                            Download
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -263,6 +267,9 @@ const downloadAllAsZip = async () => {
 }
 
 .image-item .img-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   transition: transform 0.3s ease;
 }
 
@@ -270,21 +277,35 @@ const downloadAllAsZip = async () => {
   transform: scale(1.05);
 }
 
-.image-actions {
+.content-overlay {
   position: absolute;
-  bottom: 0;
+  top: 0;
   left: 0;
   right: 0;
+  bottom: 0;
   display: flex;
-  gap: var(--space-sm);
+  flex-direction: column;
+  justify-content: space-between;
   padding: var(--space-md);
-  background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.2) 40%, rgba(0, 0, 0, 0.8) 100%);
   opacity: 0;
   transition: opacity 0.3s ease;
+  color: white;
+  z-index: 2;
 }
 
-.image-item:hover .image-actions {
+.image-item:hover .content-overlay {
   opacity: 1;
+}
+
+.overlay-top {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.overlay-bottom {
+  display: flex;
+  flex-direction: column;
 }
 
 /* Specific styles for this modal */

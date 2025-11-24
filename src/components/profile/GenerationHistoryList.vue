@@ -32,9 +32,9 @@ const downloadImage = (event: Event, imageUrl: string, historyId: number) => {
 
     <!-- History Grid -->
     <div v-else-if="history.length" class="grid grid-cols-4 gap-lg">
-      <div v-for="item in history" :key="item.id" class="card card-clickable p-0 overflow-hidden">
+      <div v-for="item in history" :key="item.id" class="history-card card card-clickable">
         <div
-          class="relative aspect-square w-full group rounded-lg"
+          class="history-thumbnail relative aspect-square w-full group rounded-lg"
           @click="openHistoryDetailModal(item.id)"
         >
           <!-- Image -->
@@ -42,7 +42,7 @@ const downloadImage = (event: Event, imageUrl: string, historyId: number) => {
             v-if="item.generatedImages?.[0]?.s3Url"
             :src="item.generatedImages[0].s3Url"
             alt="Generated"
-            class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 group-hover:brightness-75"
+            class="w-full h-full object-cover transition-transform duration-300"
           />
           <div v-else class="w-full h-full flex items-center justify-center text-muted">
             <span>No Image</span>
@@ -82,3 +82,32 @@ const downloadImage = (event: Event, imageUrl: string, historyId: number) => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.history-card {
+  overflow: hidden;
+  padding: 0; /* Override default card padding */
+  border-radius: var(--radius-lg); /* Ensure card has rounding */
+}
+
+.history-thumbnail {
+  /* This div already has relative, aspect-square, w-full, group, rounded-lg from template */
+  /* Ensure overflow hidden for image corners */
+  overflow: hidden;
+}
+
+/* Add an explicit hover effect for the image to scale, similar to ModelCard */
+.history-card:hover .history-thumbnail img {
+  transform: scale(1.05);
+}
+
+/* Explicitly ensure the overlay appears on hover */
+.history-card:hover .history-thumbnail > div.absolute {
+  opacity: 1;
+}
+
+/* This is to counteract the group-hover utility that we replaced with explicit CSS */
+.history-thumbnail img {
+  transition: transform 0.3s ease; /* Keep transition for scale */
+}
+</style>

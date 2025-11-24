@@ -122,6 +122,10 @@ const handleLogout = async () => {
 
         <!-- User Section -->
         <div class="nav-user flex items-center gap-xs">
+          <div class="hide-on-mobile">
+            <ThemeToggle />
+          </div>
+
           <!-- Desktop User Menu -->
           <template v-if="isLoggedIn && user">
             <div class="user-menu">
@@ -159,10 +163,6 @@ const handleLogout = async () => {
           <template v-else>
             <button @click="handleLogin" class="btn btn-primary btn-sm desktop-login">Login with Google</button>
           </template>
-
-          <div class="hide-on-mobile">
-            <ThemeToggle />
-          </div>
 
           <!-- Mobile Menu Button -->
           <button class="mobile-menu-btn" @click="toggleMobileMenu">
