@@ -1,5 +1,5 @@
 // ========== Configuration ==========
-const API_BASE_URL = 'http://blueming-ai-env.eba-gdfew9bx.ap-northeast-2.elasticbeanstalk.com/';
+const API_BASE_URL = 'http://blueming-ai-env.eba-gdfew9bx.ap-northeast-2.elasticbeanstalk.com';
 
 // ========== Types ==========
 export interface ApiResponse<T> {
