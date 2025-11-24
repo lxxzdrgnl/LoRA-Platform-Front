@@ -133,6 +133,7 @@ export interface GenerateConfig {
   negativePrompt?: string;
   steps?: number;
   guidanceScale?: number;
+  loraScale?: number;
   numImages?: number;
   seed?: number;
 }
@@ -163,6 +164,7 @@ export interface GenerationHistoryResponse {
   negativePrompt?: string;
   steps?: number;
   guidanceScale?: number;
+  loraScale?: number;
   seed?: number;
   numImages: number;
   status: string; // GENERATING, SUCCESS, FAILED
@@ -628,6 +630,7 @@ export const api = {
       negativePrompt?: string;
       steps?: number;
       guidanceScale?: number;
+      loraScale?: number;
       numImages?: number;
       seed?: number;
     }): Promise<ApiResponse<Record<string, unknown>>> {

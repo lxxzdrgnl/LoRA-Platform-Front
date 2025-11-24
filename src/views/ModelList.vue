@@ -57,15 +57,26 @@ const fetchModels = async () => {
       response = await api.models.getPublicModels(currentPage.value, pageSize);
     }
 
-    const modelsWithSizes: LoraModelWithSize[] = response.data.content.map((model) => {
-      const rand = Math.random();
-      if (rand < 0.18) { // 15% chance for a large card
-        return { ...model, size: 'large' };
-      }
-      return model;
-    });
+    const fetchedModels = response.data.content;
+    const numModels = fetchedModels.length;
 
-    models.value = modelsWithSizes;
+    if (numModels > 0) {
+      const numLargeCards = Math.floor((numModels - 1) / 4) + 1;
+      const largeIndices = new Set<number>();
+      while(largeIndices.size < numLargeCards && largeIndices.size < numModels) {
+        const randomIndex = Math.floor(Math.random() * numModels);
+        largeIndices.add(randomIndex);
+      }
+      
+      const modelsWithSizes: LoraModelWithSize[] = fetchedModels.map((model, index) => ({
+        ...model,
+        size: largeIndices.has(index) ? 'large' : undefined,
+      }));
+      models.value = modelsWithSizes;
+    } else {
+      models.value = [];
+    }
+
     totalPages.value = response.data.totalPages;
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to load models';
@@ -138,8 +149,7 @@ const handleOpenGenerate = (modelId: number) => {
   setTimeout(() => {
     openGenerateModal(modelId);
   }, 150);
-};
-</script>
+};</script>
 
 <template>
   <div>
