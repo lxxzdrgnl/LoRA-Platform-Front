@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { api, authStore } from '../services/api';
+import { api, authStore, getWebSocketUrl } from '../services/api';
 import { BookText, Images, BrainCircuit, ChevronDown } from 'lucide-vue-next';
 
 const router = useRouter();
@@ -262,7 +262,7 @@ const connectWebSocket = () => {
   }
 
   const userId = localStorage.getItem('userId') || '0';
-  const wsUrl = `ws://bluemingai.ap-northeast-2.elasticbeanstalk.com/ws/generation?userId=${userId}`;
+  const wsUrl = getWebSocketUrl(`/ws/training?userId=${userId}`);
 
   console.log('🔌 WebSocket 연결 시도:', wsUrl);
   statusMessage.value = 'Connecting to training server...';
@@ -386,6 +386,13 @@ const cancelTraining = async () => {
   }
 };
 
+const handleAuthCheck = (event: FocusEvent) => {
+  if (!authStore.isAuthenticated()) {
+    (event.target as HTMLElement).blur();
+    authStore.requireAuth();
+  }
+};
+
 const deleteTrainingJob = async (id: number) => {
   try {
     await api.training.deleteTrainingJob(id);
@@ -444,7 +451,7 @@ onUnmounted(() => {
             <h2 class="text-3xl font-bold mb-lg gradient-text text-center">Training Configuration</h2>
 
             <!-- Accordion -->
-            <div class="accordion" @focusin="authStore.requireAuth()">
+            <div class="accordion">
               <!-- Section 1: Model Details -->
               <div class="accordion-item">
                 <div class="accordion-header" @click="toggleSection('model-details')">
@@ -457,20 +464,20 @@ onUnmounted(() => {
                 <div v-if="openSections.includes('model-details')" class="accordion-content">
                   <div class="form-group">
                     <label class="label">Model Title *</label>
-                    <input v-model="title" type="text" class="input" placeholder="My Custom LoRA Model" :disabled="isTraining" />
+                    <input v-model="title" type="text" class="input" placeholder="My Custom LoRA Model" :disabled="isTraining" @focus="handleAuthCheck" />
                   </div>
                   <div class="form-group">
                     <label class="label">Description</label>
-                    <textarea v-model="description" class="textarea" rows="3" placeholder="Describe your model..." :disabled="isTraining"></textarea>
+                    <textarea v-model="description" class="textarea" rows="3" placeholder="Describe your model..." :disabled="isTraining" @focus="handleAuthCheck"></textarea>
                   </div>
                   <div class="grid grid-cols-2 gap-md">
                     <div class="form-group">
                       <label class="label">Character Name</label>
-                      <input v-model="characterName" type="text" class="input" placeholder="e.g., Hatsune Miku" :disabled="isTraining" />
+                      <input v-model="characterName" type="text" class="input" placeholder="e.g., Hatsune Miku" :disabled="isTraining" @focus="handleAuthCheck" />
                     </div>
                     <div class="form-group">
                       <label class="label">Style</label>
-                      <input v-model="style" type="text" class="input" placeholder="e.g., Anime, Illustration" :disabled="isTraining" />
+                      <input v-model="style" type="text" class="input" placeholder="e.g., Anime, Illustration" :disabled="isTraining" @focus="handleAuthCheck" />
                     </div>
                   </div>
                 </div>

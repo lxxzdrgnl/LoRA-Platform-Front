@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
-import { api, authStore, type LoraModel, type GenerationProgressResponse } from '../services/api';
+import { api, authStore, getWebSocketUrl, type LoraModel, type GenerationProgressResponse } from '../services/api';
 
 const props = defineProps<{
   show: boolean;
@@ -300,7 +300,7 @@ const connectWebSocket = () => {
   }
 
   const userId = localStorage.getItem('userId') || '0';
-  const wsUrl = `ws://bluemingai.ap-northeast-2.elasticbeanstalk.com/ws/generation?userId=${userId}`;
+  const wsUrl = getWebSocketUrl(`/ws/generation?userId=${userId}`);
 
   console.log('🔌 WebSocket 연결 시도:', wsUrl);
   statusMessage.value = '모델 불러오는 중...';
@@ -426,6 +426,13 @@ const disconnectWebSocket = () => {
   }
 };
 
+const handleAuthCheck = (event: FocusEvent) => {
+  if (!authStore.isAuthenticated()) {
+    (event.target as HTMLElement).blur();
+    authStore.requireAuth();
+  }
+};
+
 const downloadImage = (url: string, index: number) => {
   const link = document.createElement('a');
   link.href = url;
@@ -459,7 +466,7 @@ onUnmounted(() => {
       <div class="modal-body-content hide-scrollbar">
         <div class="grid grid-cols-2 gap-xl">
           <!-- Left: Configuration -->
-          <div class="config-section" @focusin="authStore.requireAuth()">
+          <div class="config-section">
             <div class="card">
               <h2 class="text-2xl font-bold mb-lg gradient-text">Configuration</h2>
 
@@ -481,13 +488,13 @@ onUnmounted(() => {
               <!-- Prompt -->
               <div class="form-group">
                 <label class="label">Prompt</label>
-                <textarea v-model="prompt" class="textarea" rows="4" placeholder="1girl, beautiful, detailed face, high quality..." :disabled="isGenerating"></textarea>
+                <textarea v-model="prompt" @focus="handleAuthCheck" class="textarea" rows="4" placeholder="1girl, beautiful, detailed face, high quality..." :disabled="isGenerating"></textarea>
               </div>
 
               <!-- Negative Prompt -->
               <div class="form-group">
                 <label class="label">Negative Prompt</label>
-                <textarea v-model="negativePrompt" class="textarea" rows="3" placeholder="lowres, bad anatomy..." :disabled="isGenerating"></textarea>
+                <textarea v-model="negativePrompt" @focus="handleAuthCheck" class="textarea" rows="3" placeholder="lowres, bad anatomy..." :disabled="isGenerating"></textarea>
               </div>
 
               <!-- Parameters -->

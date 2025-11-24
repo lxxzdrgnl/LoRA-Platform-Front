@@ -1,5 +1,15 @@
 // ========== Configuration ==========
-const API_BASE_URL = 'http://blueming-ai-env.eba-gdfew9bx.ap-northeast-2.elasticbeanstalk.com';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://blueming-ai-env.eba-gdfew9bx.ap-northeast-2.elasticbeanstalk.com';
+
+export const getWebSocketUrl = (path: string): string => {
+  if (API_BASE_URL.startsWith('http')) {
+    const wsUrl = API_BASE_URL.replace(/^http/, 'ws');
+    return `${wsUrl}${path}`;
+  }
+  // For local dev with proxy (API_BASE_URL is empty)
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${wsProtocol}://${window.location.host}${path}`;
+};
 
 // ========== Types ==========
 export interface ApiResponse<T> {
