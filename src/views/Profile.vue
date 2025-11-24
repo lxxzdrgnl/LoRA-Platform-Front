@@ -3,7 +3,6 @@ import { ref, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import ModelCard from '../components/ModelCard.vue';
 import ModelDetailModal from '../components/ModelDetailModal.vue';
-import GenerateHistoryCard from '../components/GenerateHistoryCard.vue';
 import GenerateHistoryDetailModal from '../components/GenerateHistoryDetailModal.vue';
 import { api, authStore, type UserResponse, type LoraModel } from '../services/api';
 
@@ -115,8 +114,6 @@ const loadMyModels = async () => {
     console.error('Failed to load my models:', error);
   }
 };
-
-
 
 const loadLikedModels = async () => {
   try {
@@ -338,8 +335,6 @@ const saveProfile = async () => {
             </div>
           </div>
 
-
-
           <!-- Empty State -->
           <div v-if="likedModels.length === 0" class="card text-center p-xl">
             <p class="text-secondary text-lg">좋아요한 모델이 없습니다</p>
@@ -368,13 +363,45 @@ const saveProfile = async () => {
 
           <!-- Generation History -->
           <div v-if="historySubTab === 'generate'">
-            <div v-if="generationHistory.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-lg">
-              <GenerateHistoryCard
-                v-for="history in generationHistory"
-                :key="history.id"
-                :history="history"
-                @view-details="openHistoryDetailModal(history.id)"
-              />
+            <div v-if="generationHistory.length" class="grid grid-cols-4 gap-lg">
+              <div v-for="item in generationHistory" :key="item.id" class="card p-0 overflow-hidden relative transition-transform duration-300 hover:translate-y-[-4px] hover:shadow-lg cursor-pointer" @click="openHistoryDetailModal(item.id)">
+                <!-- Status Badge -->
+                <div v-if="item.status === 'GENERATING'" class="absolute z-10 flex items-center gap-sm px-sm py-xs rounded badge-primary text-white" style="top: var(--space-sm); right: var(--space-sm); backdrop-filter: blur(4px);">
+                  <div class="loading"></div>
+                  <span class="text-xs">생성 중</span>
+                  <span v-if="item.currentStep && item.totalSteps" class="text-xs opacity-75">
+                    {{ item.currentStep }}/{{ item.totalSteps }}
+                  </span>
+                </div>
+                <div v-else-if="item.status === 'FAILED'" class="absolute z-10 badge badge-error text-white" style="top: var(--space-sm); right: var(--space-sm); backdrop-filter: blur(4px);">
+                  생성 실패
+                </div>
+
+                <!-- Generated Images -->
+                <div v-if="item.generatedImages && item.generatedImages.length > 0" class="relative">
+                  <img
+                    :src="item.generatedImages[0].s3Url"
+                    alt="Generated"
+                    class="w-full aspect-square object-cover"
+                  />
+                  <div v-if="item.generatedImages.length > 1" class="absolute badge text-white" style="bottom: var(--space-sm); right: var(--space-sm); background: rgba(0, 0, 0, 0.7);">
+                    +{{ item.generatedImages.length - 1 }}
+                  </div>
+                </div>
+                <div v-else class="w-full aspect-square flex items-center justify-center" style="background: var(--bg-hover);">
+                  <p class="text-sm text-muted text-center">
+                    <span v-if="item.status === 'GENERATING'">이미지 생성 중...</span>
+                    <span v-else>이미지 없음</span>
+                  </p>
+                </div>
+
+                <!-- Info -->
+                <div class="p-md">
+                  <p class="text-sm text-muted mb-xs">{{ new Date(item.createdAt).toLocaleString() }}</p>
+                  <p class="text-sm font-semibold mb-xs truncate">{{ item.modelTitle || 'Unknown Model' }}</p>
+                  <p class="text-sm truncate text-secondary">{{ item.prompt }}</p>
+                </div>
+              </div>
             </div>
             <div v-else class="card text-center p-xl">
               <p class="text-secondary text-lg">생성 기록이 없습니다</p>
@@ -451,102 +478,3 @@ const saveProfile = async () => {
   />
 </template>
 
-<style scoped>
-/* Profile-specific styles - using main.css utility classes where possible */
-.profile-avatar {
-  width: 120px;
-  height: 120px;
-}
-
-.tabs-container {
-  display: flex;
-  gap: var(--space-sm);
-  border-bottom: 2px solid var(--border);
-}
-
-.tab-btn {
-  padding: var(--space-md) var(--space-lg);
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -2px;
-  transition: all 0.3s ease;
-}
-
-.tab-btn:hover {
-  color: var(--text-primary);
-}
-
-.tab-btn.active {
-  color: var(--text-primary);
-  border-bottom-color: var(--primary);
-}
-
-.stat-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-xs);
-}
-
-.stat-value {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.stat-label {
-  font-size: 14px;
-  color: var(--text-muted);
-}
-
-/* History Sub-tabs */
-.history-subtabs {
-  display: flex;
-  gap: var(--space-sm);
-  border-bottom: 2px solid var(--border);
-  margin-bottom: var(--space-lg);
-}
-
-.subtab-btn {
-  padding: var(--space-sm) var(--space-md);
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -2px;
-  transition: all 0.3s ease;
-}
-
-.subtab-btn:hover {
-  color: var(--text-primary);
-}
-
-.subtab-btn.active {
-  color: var(--primary);
-  border-bottom-color: var(--primary);
-}
-
-/* Hover effect utility */
-.hover\:translate-y-\[-4px\]:hover {
-  transform: translateY(-4px);
-}
-
-@media (max-width: 768px) {
-  .tabs-container {
-    overflow-x: auto;
-  }
-
-  .tab-btn {
-    white-space: nowrap;
-    padding: var(--space-md) var(--space-xs);
-  }
-}
-</style>

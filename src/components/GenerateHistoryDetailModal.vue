@@ -22,6 +22,7 @@ watch(() => props.historyId, async (newId) => {
 const fetchHistoryDetails = async (id: number) => {
   try {
     loading.value = true;
+    error.value = '';
     const response = await api.generate.getHistoryDetail(id);
     history.value = response.data;
   } catch (err) {
@@ -44,93 +45,121 @@ const deleteHistory = async () => {
 
 const closeModal = () => {
   emit('close');
-  // Reset state when closing
-  history.value = null;
-  error.value = '';
+  history.value = null; // Reset on close
 };
 
 const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-        // Optional: show a small toast or confirmation message
-    });
+    navigator.clipboard.writeText(text);
+    // Maybe show a toast message here
 }
+
+const downloadImage = async (imageUrl: string, historyId: number, imageId: number) => {
+  try {
+    const response = await fetch(imageUrl);
+    if (!response.ok) throw new Error('Network response was not ok.');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `blueming_ai_history_${historyId}_${imageId}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('Download failed:', error);
+    window.open(imageUrl, '_blank');
+  }
+};
 </script>
 
 <template>
-  <div v-if="show" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-lg" @click="closeModal">
-    <div class="card w-full max-w-4xl max-h-[90vh] flex flex-col" @click.stop>
-      <button @click="closeModal" class="absolute -top-4 -right-4 btn btn-icon btn-secondary rounded-full">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-      </button>
+  <div v-if="show" class="modal-overlay" @click="closeModal">
+    <div class="modal-content" @click.stop>
+      <div class="modal-header">
+        <h1 class="text-3xl font-bold gradient-text">Generation Details</h1>
+        <button class="modal-close" @click="closeModal">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
 
-      <div class="overflow-auto hide-scrollbar p-sm">
+      <div class="modal-body-content hide-scrollbar">
         <div v-if="loading" class="flex justify-center p-xl">
             <div class="loading"></div>
         </div>
-        <div v-else-if="error" class="text-center p-xl text-error">{{ error }}</div>
-        <div v-else-if="history" class="grid grid-cols-1 md:grid-cols-5 gap-xl">
-            <!-- Left Column: Images -->
-            <div class="md:col-span-3 grid grid-cols-2 gap-md">
-                 <div v-for="image in history.generatedImages" :key="image.id" class="aspect-square bg-card rounded-lg overflow-hidden relative group">
-                    <img :src="image.s3Url" alt="Generated image" class="img-cover"/>
-                    <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                        <a :href="image.s3Url" download class="btn btn-primary btn-sm" @click.stop>
-                            Download
-                        </a>
+        <div v-else-if="error" class="card text-center p-xl text-error bg-red-500/10">
+            {{ error }}
+        </div>
+        <div v-else-if="history" class="grid grid-cols-2 gap-xl">
+            <!-- Left: Generated Images -->
+            <div class="card">
+                <h2 class="text-2xl font-bold mb-lg gradient-text">Result Images</h2>
+                <div class="images-grid">
+                    <div v-for="image in history.generatedImages" :key="image.id" class="image-item">
+                        <img :src="image.s3Url" alt="Generated image" class="img-cover"/>
+                        <div class="image-actions">
+                            <button class="btn btn-secondary btn-sm flex-1" @click.stop="downloadImage(image.s3Url, history.id, image.id)">
+                                Download
+                            </button>
+                        </div>
                     </div>
-                 </div>
+                </div>
             </div>
 
-            <!-- Right Column: Details -->
-            <div class="md:col-span-2 flex flex-col">
-                <h2 class="text-2xl font-bold mb-md">{{ history.modelTitle }}</h2>
+            <!-- Right: Details -->
+            <div class="card">
+                <h2 class="text-2xl font-bold mb-lg gradient-text">Parameters</h2>
+                
+                <div class="form-group">
+                    <label class="label">Model Used</label>
+                    <p class="font-medium text-primary">{{ history.modelTitle }}</p>
+                </div>
 
-                <div class="mb-lg">
-                    <h3 class="label">Status</h3>
-                    <p class="badge" :class="{
+                <div class="form-group">
+                    <label class="label">Status</label>
+                     <p class="badge" :class="{
                         'badge-success': history.status === 'SUCCESS',
                         'badge-error': history.status === 'FAILED',
                         'badge-warning': ['PENDING', 'GENERATING'].includes(history.status)
                     }">{{ history.status }}</p>
                 </div>
 
-                <div class="mb-lg">
+                <div class="form-group">
                     <label class="label">Positive Prompt</label>
-                    <div class="bg-card border border-border rounded-md p-md flex justify-between items-start gap-sm">
-                        <p class="text-sm text-secondary flex-1 break-all">{{ history.prompt }}</p>
+                    <div class="prompt-box">
+                        <p>{{ history.prompt }}</p>
                         <button class="btn btn-ghost btn-sm" @click="copyToClipboard(history.prompt)">Copy</button>
                     </div>
                 </div>
 
-                <div class="mb-lg">
+                <div class="form-group">
                     <label class="label">Negative Prompt</label>
-                    <div class="bg-card border border-border rounded-md p-md flex justify-between items-start gap-sm">
-                        <p class="text-sm text-secondary flex-1 break-all">{{ history.negativePrompt }}</p>
+                    <div class="prompt-box">
+                        <p>{{ history.negativePrompt }}</p>
                         <button class="btn btn-ghost btn-sm" @click="copyToClipboard(history.negativePrompt)">Copy</button>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-md">
-                    <div class="mb-lg">
+                <div class="grid grid-cols-3 gap-md">
+                    <div class="form-group">
                         <label class="label">Steps</label>
                         <p class="font-medium text-primary">{{ history.steps }}</p>
                     </div>
-                    <div class="mb-lg">
-                        <label class="label">Guidance Scale</label>
+                    <div class="form-group">
+                        <label class="label">Guidance</label>
                         <p class="font-medium text-primary">{{ history.guidanceScale }}</p>
                     </div>
-                     <div class="mb-lg">
+                     <div class="form-group">
                         <label class="label">Seed</label>
                         <p class="font-medium text-primary">{{ history.seed }}</p>
                     </div>
                 </div>
-
+                
                 <div class="mt-auto pt-lg">
-                    <button class="btn w-full bg-red-500/10 text-error hover:bg-red-500/20" @click="deleteHistory">
-                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                    <button class="btn w-full text-error" @click="deleteHistory" style="background: var(--error-light, rgba(239, 68, 68, 0.1));">
                         Delete Generation
                     </button>
                 </div>
@@ -140,11 +169,125 @@ const copyToClipboard = (text: string) => {
     </div>
   </div>
 </template>
-<style>
-.break-all {
-    word-break: break-all;
+
+<style scoped>
+/* Scoped styles from GenerateModal for consistency */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: var(--space-lg);
 }
-.hover\:bg-red-500\/20:hover {
-    background-color: rgba(239, 68, 68, 0.2);
+
+.modal-content {
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  width: 100%;
+  max-width: 1200px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-lg);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.modal-close {
+  padding: var(--space-sm);
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.modal-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.modal-body-content {
+  padding: var(--space-xl);
+  overflow-y: auto;
+}
+
+.images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-lg);
+}
+
+.image-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--bg-hover);
+}
+
+.image-item .img-cover {
+  transition: transform 0.3s ease;
+}
+
+.image-item:hover .img-cover {
+  transform: scale(1.05);
+}
+
+.image-actions {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.image-item:hover .image-actions {
+  opacity: 1;
+}
+
+/* Specific styles for this modal */
+.prompt-box {
+  background: var(--bg-hover);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  font-size: 14px;
+  color: var(--text-secondary);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  word-break: break-all;
+}
+
+.prompt-box p {
+    flex: 1;
+}
+
+@media (max-width: 1024px) {
+  .grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
