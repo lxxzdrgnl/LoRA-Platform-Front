@@ -27,6 +27,7 @@ const prompt = ref('');
 const negativePrompt = ref('lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality');
 const steps = ref(30);
 const guidanceScale = ref(7.5);
+const loraScale = ref(1.0); // LoRA 강도 (0.0~2.0, 기본값 1.0)
 const numImages = ref(1);
 const seed = ref<number | undefined>(undefined);
 
@@ -119,6 +120,7 @@ const checkOngoingGeneration = async () => {
       negativePrompt.value = response.data.negativePrompt || '';
       steps.value = response.data.steps || 30;
       guidanceScale.value = response.data.guidanceScale || 7.5;
+      loraScale.value = response.data.loraScale || 1.0;
       numImages.value = response.data.numImages || 1;
       seed.value = response.data.seed;
 
@@ -249,6 +251,9 @@ const startGeneration = async () => {
     }
     if (guidanceScale.value) {
       payload.guidanceScale = guidanceScale.value;
+    }
+    if (loraScale.value) {
+      payload.loraScale = loraScale.value;
     }
     if (numImages.value) {
       payload.numImages = numImages.value;
@@ -506,6 +511,10 @@ onUnmounted(() => {
                 <div class="form-group">
                   <label class="label">Guidance Scale: {{ guidanceScale }}</label>
                   <input v-model.number="guidanceScale" type="range" min="1" max="20" step="0.5" class="input" :disabled="isGenerating" />
+                </div>
+                <div class="form-group">
+                  <label class="label">LoRA Weight: {{ loraScale.toFixed(2) }}</label>
+                  <input v-model.number="loraScale" type="range" min="0" max="2" step="0.05" class="input" :disabled="isGenerating" />
                 </div>
                 <div class="form-group">
                   <label class="label">Number of Images</label>
