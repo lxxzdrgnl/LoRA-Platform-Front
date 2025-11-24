@@ -164,6 +164,7 @@ const downloadImage = async (event: Event, imageUrl: string, historyId: number) 
     window.URL.revokeObjectURL(url);
   } catch (error) {
     console.error('Download failed:', error);
+    alert(`Download failed: ${error}. This might be a CORS issue. Opening image in a new tab as a fallback.`);
     window.open(imageUrl, '_blank');
   }
 };
@@ -397,42 +398,35 @@ const saveProfile = async () => {
           <!-- Generation History -->
           <div v-if="historySubTab === 'generate'">
             <div v-if="generationHistory.length" class="grid grid-cols-4 gap-lg">
-              <div v-for="item in generationHistory" :key="item.id" class="card p-0 overflow-hidden relative group">
-                <!-- Hover Overlay -->
-                <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-md z-20">
-                    <button class="btn btn-primary btn-sm" @click="openHistoryDetailModal(item.id)">Details</button>
-                    <button class="btn btn-secondary btn-sm" @click.stop="downloadImage($event, item.thumbnailUrl, item.id)">Download</button>
-                </div>
-                
-                <!-- Status Badge -->
-                <div v-if="item.status === 'GENERATING'" class="absolute z-10 flex items-center gap-sm px-sm py-xs rounded badge-primary text-white" style="top: var(--space-sm); right: var(--space-sm); backdrop-filter: blur(4px);">
-                  <div class="loading"></div>
-                  <span class="text-xs">생성 중</span>
-                  <span v-if="item.currentStep && item.totalSteps" class="text-xs opacity-75">
-                    {{ item.currentStep }}/{{ item.totalSteps }}
-                  </span>
-                </div>
-                <div v-else-if="item.status === 'FAILED'" class="absolute z-10 badge badge-error text-white" style="top: var(--space-sm); right: var(--space-sm); backdrop-filter: blur(4px);">
-                  생성 실패
-                </div>
-
-                <!-- Generated Images -->
-                <div class="relative">
+              <div v-for="item in generationHistory" :key="item.id" class="card card-clickable p-0 overflow-hidden">
+                <div 
+                  class="relative aspect-square w-full group bg-bg-hover"
+                  @click="openHistoryDetailModal(item.id)"
+                >
+                  <!-- Image -->
                   <img
+                    v-if="item.thumbnailUrl"
                     :src="item.thumbnailUrl"
                     alt="Generated"
-                    class="w-full aspect-square object-cover"
+                    class="w-full h-full object-contain"
                   />
-                  <div v-if="item.generatedImages && item.generatedImages.length > 1" class="absolute badge text-white" style="bottom: var(--space-sm); right: var(--space-sm); background: rgba(0, 0, 0, 0.7);">
-                    +{{ item.generatedImages.length - 1 }}
+                  <div v-else class="w-full h-full flex items-center justify-center text-muted">
+                    <span>No Image</span>
                   </div>
-                </div>
-                
-                <!-- Info -->
-                <div class="p-md">
-                  <p class="text-sm text-muted mb-xs">{{ new Date(item.createdAt).toLocaleString() }}</p>
-                  <p class="text-sm font-semibold mb-xs truncate">{{ item.modelTitle || 'Unknown Model' }}</p>
-                  <p class="text-sm truncate text-secondary">{{ item.prompt }}</p>
+
+                  <!-- Hover Overlay -->
+                  <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-between p-md text-white">
+                    <!-- Top Actions -->
+                    <div class="flex justify-end gap-sm">
+                       <button class="btn btn-secondary btn-sm" @click.stop="downloadImage($event, item.thumbnailUrl, item.id)">Download</button>
+                       <button class="btn btn-primary btn-sm" @click.stop="openHistoryDetailModal(item.id)">Details</button>
+                    </div>
+                    <!-- Bottom Info -->
+                    <div class="cursor-pointer" @click="openHistoryDetailModal(item.id)">
+                      <h4 class="font-bold truncate">{{ item.modelTitle || 'Unknown Model' }}</h4>
+                      <p class="text-sm line-clamp-2" style="color: #e0e0e0;">{{ item.prompt }}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
