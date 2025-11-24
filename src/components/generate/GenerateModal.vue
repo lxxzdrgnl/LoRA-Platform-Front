@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import { useAuthStore } from '../../stores/auth';
-import { api, getWebSocketUrl, type LoraModel, type GenerationProgressResponse } from '../../services/api';
+import { api, getWebSocketUrl, type LoraModel, type GenerationProgressResponse, type ModelDetailResponse } from '../../services/api';
 
 const authStore = useAuthStore();
 
@@ -15,7 +15,11 @@ const emit = defineEmits(['close']);
 // 모델 데이터
 const myModels = ref<LoraModel[]>([]);
 const communityModels = ref<LoraModel[]>([]);
-const selectedModel = ref<LoraModel | null>(null);
+const selectedModel = ref<ModelDetailResponse | null>(null); // Changed type to ModelDetailResponse to ensure prompts are available
+
+// 예시 프롬프트
+const examplePrompt = ref<{ prompt: string; negativePrompt: string } | null>(null);
+const copyStatus = ref<'positive' | 'negative' | null>(null);
 
 // 모달 상태
 const showModelModal = ref(false);
@@ -60,6 +64,7 @@ watch(() => props.show, async (newVal) => {
     currentStep.value = 0;
     totalSteps.value = 0;
     statusMessage.value = '';
+    examplePrompt.value = null; // Reset example prompt
 
     await loadModels();
     if (props.initialModelId) {
@@ -188,28 +193,41 @@ const closeModelModal = () => {
   showModelModal.value = false;
 };
 
-const selectModel = (model: LoraModel) => {
+const selectModel = async (model: LoraModel) => { // Changed to async
   if (!model.s3Key) {
     error.value = `모델 "${model.title}"의 학습 파일이 아직 업로드되지 않았습니다. 학습이 완전히 완료된 후 다시 시도해주세요.`;
     closeModelModal();
     return;
   }
-  selectedModel.value = model;
+  // Always fetch full detail to ensure prompts are available
+  await selectModelById(model.id); // Call selectModelById to fetch full details
   closeModelModal();
 };
 
 const selectModelById = async (modelId: number) => {
-  let model = myModels.value.find(m => m.id === modelId) || communityModels.value.find(m => m.id === modelId);
-  if (!model) {
-    try {
-      const response = await api.models.getModelDetail(modelId);
-      model = response.data;
-    } catch (err) {
-      console.error('Failed to load model:', err);
-      return;
+  try {
+    const response = await api.models.getModelDetail(modelId); // Always fetch full detail
+    selectedModel.value = response.data;
+    // Set example prompt if available
+    if (response.data.prompts && response.data.prompts.length > 0) {
+      const firstPrompt = response.data.prompts[0];
+      if (firstPrompt) {
+        examplePrompt.value = {
+          prompt: firstPrompt.prompt,
+          negativePrompt: firstPrompt.negativePrompt
+        };
+      } else {
+        examplePrompt.value = null;
+      }
+    } else {
+      examplePrompt.value = null;
     }
+  } catch (err) {
+    console.error('Failed to load model details for generate modal:', err);
+    error.value = 'Failed to load model details for selected model.';
+    selectedModel.value = null;
+    examplePrompt.value = null;
   }
-  selectedModel.value = model;
 };
 
 const startGeneration = async () => {
@@ -441,6 +459,14 @@ const handleAuthCheck = (event: FocusEvent) => {
   }
 };
 
+const copyToClipboard = (text: string, type: 'positive' | 'negative') => {
+  navigator.clipboard.writeText(text);
+  copyStatus.value = type;
+  setTimeout(() => {
+    copyStatus.value = null;
+  }, 1500); // Revert back after 1.5 seconds
+};
+
 const downloadImage = (url: string, index: number) => {
   const link = document.createElement('a');
   link.href = url;
@@ -497,12 +523,32 @@ onUnmounted(() => {
               <div class="form-group">
                 <label class="label">Prompt</label>
                 <textarea v-model="prompt" @focus="handleAuthCheck" class="textarea" rows="4" placeholder="1girl, beautiful, detailed face, high quality..." :disabled="isGenerating"></textarea>
+
+                <div v-if="examplePrompt && examplePrompt.prompt" class="example-prompt-box mt-md">
+                  <div class="flex items-center justify-between mb-sm">
+                    <span class="text-sm text-secondary">Example Prompt</span>
+                    <button class="btn btn-ghost btn-sm" @click="copyToClipboard(examplePrompt.prompt, 'positive')">
+                      {{ copyStatus === 'positive' ? 'Copied!' : 'Copy' }}
+                    </button>
+                  </div>
+                  <p class="text-sm text-muted line-clamp-2">{{ examplePrompt.prompt }}</p>
+                </div>
               </div>
 
               <!-- Negative Prompt -->
               <div class="form-group">
                 <label class="label">Negative Prompt</label>
                 <textarea v-model="negativePrompt" @focus="handleAuthCheck" class="textarea" rows="3" placeholder="lowres, bad anatomy..." :disabled="isGenerating"></textarea>
+
+                <div v-if="examplePrompt && examplePrompt.negativePrompt" class="example-prompt-box mt-md">
+                  <div class="flex items-center justify-between mb-sm">
+                    <span class="text-sm text-secondary">Example Negative Prompt</span>
+                    <button class="btn btn-ghost btn-sm" @click="copyToClipboard(examplePrompt.negativePrompt, 'negative')">
+                      {{ copyStatus === 'negative' ? 'Copied!' : 'Copy' }}
+                    </button>
+                  </div>
+                  <p class="text-sm text-muted line-clamp-2">{{ examplePrompt.negativePrompt }}</p>
+                </div>
               </div>
 
               <!-- Parameters -->
@@ -885,6 +931,17 @@ onUnmounted(() => {
   color: var(--text-muted);
   margin: 0;
   margin-top: auto;
+}
+
+.example-prompt-box {
+  background: var(--bg-body); /* Lighter background for distinction */
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+}
+
+.example-prompt-box p {
+  word-break: break-word; /* Ensure long prompts wrap */
 }
 
 @media (max-width: 1024px) {

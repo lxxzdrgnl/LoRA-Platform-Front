@@ -32,6 +32,8 @@ const newPrompt = ref({
   description: ''
 });
 
+const copiedPromptId = ref<number | null>(null);
+
 const isOwner = computed(() => {
   return currentUser.value && model.value && model.value.userId === currentUser.value.id;
 });
@@ -118,8 +120,12 @@ const toggleCommentLike = async (commentId: number) => {
   }
 };
 
-const copyPrompt = (prompt: string) => {
-  navigator.clipboard.writeText(prompt);
+const copyPrompt = (promptId: number, text: string) => {
+  navigator.clipboard.writeText(text);
+  copiedPromptId.value = promptId;
+  setTimeout(() => {
+    copiedPromptId.value = null;
+  }, 1500); // Revert back after 1.5 seconds
 };
 
 const openGenerateModal = () => {
@@ -292,14 +298,14 @@ const deleteComment = async (commentId: number) => {
                     <div class="prompt-box mb-md">
                       <div class="flex items-center justify-between mb-sm">
                         <span class="text-sm text-secondary">Positive Prompt</span>
-                        <button class="btn btn-ghost btn-sm" @click="copyPrompt(prompt.prompt)">Copy</button>
+                        <button class="btn btn-ghost btn-sm" @click="copyPrompt(prompt.id, prompt.prompt)">{{ copiedPromptId === prompt.id ? 'Copied!' : 'Copy' }}</button>
                       </div>
                       <p class="prompt-text">{{ prompt.prompt }}</p>
                     </div>
                     <div class="prompt-box">
                       <div class="flex items-center justify-between mb-sm">
                         <span class="text-sm text-secondary">Negative Prompt</span>
-                        <button class="btn btn-ghost btn-sm" @click="copyPrompt(prompt.negativePrompt)">Copy</button>
+                        <button class="btn btn-ghost btn-sm" @click="copyPrompt(prompt.id, prompt.negativePrompt)">{{ copiedPromptId === prompt.id ? 'Copied!' : 'Copy' }}</button>
                       </div>
                       <p class="prompt-text">{{ prompt.negativePrompt }}</p>
                     </div>

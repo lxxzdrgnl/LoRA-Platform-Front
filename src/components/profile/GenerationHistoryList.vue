@@ -69,7 +69,7 @@ const downloadImage = (event: Event, imageUrl: string, historyId: number) => {
             <!-- Bottom Info -->
             <div class="cursor-pointer" @click="openHistoryDetailModal(item.id)">
               <h4 class="font-bold truncate">{{ item.modelTitle || 'Unknown Model' }}</h4>
-              <p class="text-sm line-clamp-2 text-secondary">{{ item.prompt }}</p>
+              <p class="text-sm line-clamp-2 prompt-text">{{ item.prompt }}</p>
             </div>
           </div>
         </div>
@@ -99,6 +99,7 @@ const downloadImage = (event: Event, imageUrl: string, historyId: number) => {
 /* Add an explicit hover effect for the image to scale, similar to ModelCard */
 .history-card:hover .history-thumbnail img {
   transform: scale(1.05);
+  filter: brightness(0.75); /* Re-adding the brightness filter */
 }
 
 /* Explicitly ensure the overlay appears on hover */
@@ -108,6 +109,10 @@ const downloadImage = (event: Event, imageUrl: string, historyId: number) => {
 
 /* This is to counteract the group-hover utility that we replaced with explicit CSS */
 .history-thumbnail img {
-  transition: transform 0.3s ease; /* Keep transition for scale */
+  transition: transform 0.3s ease, filter 0.3s ease; /* Keep transition for scale and add for filter */
+}
+
+.prompt-text {
+  color: #e0e0e0; /* A whitish-gray, matching ModelCard */
 }
 </style>

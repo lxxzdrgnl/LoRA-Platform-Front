@@ -12,6 +12,7 @@ import FavoritesTab from '../components/profile/FavoritesTab.vue';
 import HistoryTab from '../components/profile/HistoryTab.vue';
 import ModelDetailModal from '../components/models/ModelDetailModal.vue';
 import GenerateHistoryDetailModal from '../components/generate/GenerateHistoryDetailModal.vue';
+import GenerateModal from '../components/generate/GenerateModal.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -27,6 +28,7 @@ const showDetailModal = ref(false);
 const selectedModelId = ref<number | null>(null);
 const showHistoryDetailModal = ref(false);
 const selectedHistoryId = ref<number | null>(null);
+const showGenerateModal = ref(false);
 
 // Tab state
 const getInitialTab = () => {
@@ -93,6 +95,23 @@ const closeHistoryDetailModal = () => {
 const handleHistoryDeleted = (historyId: number) => {
   deleteGenerationHistory(historyId);
   closeHistoryDetailModal();
+};
+
+const openGenerateModal = (modelId: number | null = null) => {
+  selectedModelId.value = modelId;
+  showGenerateModal.value = true;
+};
+
+const closeGenerateModal = () => {
+  showGenerateModal.value = false;
+  selectedModelId.value = null;
+};
+
+const handleOpenGenerate = (modelId: number) => {
+  closeModelDetail();
+  setTimeout(() => {
+    openGenerateModal(modelId);
+  }, 150);
 };
 
 // Profile update handler
@@ -187,6 +206,7 @@ const handleDownloadImage = async (event: Event, imageUrl: string, historyId: nu
     :model-id="selectedModelId"
     @close="closeModelDetail"
     @model-update="refreshAllModels"
+    @open-generate="handleOpenGenerate"
   />
   <GenerateHistoryDetailModal
     :show="showHistoryDetailModal"
@@ -194,6 +214,7 @@ const handleDownloadImage = async (event: Event, imageUrl: string, historyId: nu
     @close="closeHistoryDetailModal"
     @deleted="handleHistoryDeleted"
   />
+  <GenerateModal :show="showGenerateModal" :initial-model-id="selectedModelId" @close="closeGenerateModal" />
 </template>
 
 <style scoped>
