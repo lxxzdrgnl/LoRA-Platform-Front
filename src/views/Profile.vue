@@ -129,9 +129,42 @@ const loadLikedModels = async () => {
 const loadGenerationHistory = async () => {
   try {
     const response = await api.generate.getHistoryList(0, 20);
-    generationHistory.value = response.data.content;
+    // Manually add thumbnailUrl for the template
+    generationHistory.value = response.data.content.map(item => ({
+      ...item,
+      thumbnailUrl: item.generatedImages?.[0]?.s3Url
+    }));
   } catch (error) {
     console.error('Failed to load generation history:', error);
+  }
+};
+
+const downloadImage = async (event: Event, imageUrl: string, historyId: number) => {
+  event.stopPropagation(); // Prevent modal from opening
+  if (!imageUrl) {
+    alert('No image available for download.');
+    return;
+  }
+
+  try {
+    const response = await fetch(imageUrl);
+    if (!response.ok) throw new Error('Network response was not ok.');
+    
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `blueming_ai_history_${historyId}.png`;
+    
+    document.body.appendChild(link);
+    link.click();
+    
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('Download failed:', error);
+    window.open(imageUrl, '_blank');
   }
 };
 
@@ -364,7 +397,13 @@ const saveProfile = async () => {
           <!-- Generation History -->
           <div v-if="historySubTab === 'generate'">
             <div v-if="generationHistory.length" class="grid grid-cols-4 gap-lg">
-              <div v-for="item in generationHistory" :key="item.id" class="card p-0 overflow-hidden relative transition-transform duration-300 hover:translate-y-[-4px] hover:shadow-lg cursor-pointer" @click="openHistoryDetailModal(item.id)">
+              <div v-for="item in generationHistory" :key="item.id" class="card p-0 overflow-hidden relative group">
+                <!-- Hover Overlay -->
+                <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-md z-20">
+                    <button class="btn btn-primary btn-sm" @click="openHistoryDetailModal(item.id)">Details</button>
+                    <button class="btn btn-secondary btn-sm" @click.stop="downloadImage($event, item.thumbnailUrl, item.id)">Download</button>
+                </div>
+                
                 <!-- Status Badge -->
                 <div v-if="item.status === 'GENERATING'" class="absolute z-10 flex items-center gap-sm px-sm py-xs rounded badge-primary text-white" style="top: var(--space-sm); right: var(--space-sm); backdrop-filter: blur(4px);">
                   <div class="loading"></div>
@@ -378,23 +417,17 @@ const saveProfile = async () => {
                 </div>
 
                 <!-- Generated Images -->
-                <div v-if="item.generatedImages && item.generatedImages.length > 0" class="relative">
+                <div class="relative">
                   <img
-                    :src="item.generatedImages[0].s3Url"
+                    :src="item.thumbnailUrl"
                     alt="Generated"
                     class="w-full aspect-square object-cover"
                   />
-                  <div v-if="item.generatedImages.length > 1" class="absolute badge text-white" style="bottom: var(--space-sm); right: var(--space-sm); background: rgba(0, 0, 0, 0.7);">
+                  <div v-if="item.generatedImages && item.generatedImages.length > 1" class="absolute badge text-white" style="bottom: var(--space-sm); right: var(--space-sm); background: rgba(0, 0, 0, 0.7);">
                     +{{ item.generatedImages.length - 1 }}
                   </div>
                 </div>
-                <div v-else class="w-full aspect-square flex items-center justify-center" style="background: var(--bg-hover);">
-                  <p class="text-sm text-muted text-center">
-                    <span v-if="item.status === 'GENERATING'">이미지 생성 중...</span>
-                    <span v-else>이미지 없음</span>
-                  </p>
-                </div>
-
+                
                 <!-- Info -->
                 <div class="p-md">
                   <p class="text-sm text-muted mb-xs">{{ new Date(item.createdAt).toLocaleString() }}</p>
@@ -477,4 +510,104 @@ const saveProfile = async () => {
     @deleted="handleHistoryDeleted"
   />
 </template>
+
+<style scoped>
+/* Profile-specific styles - using main.css utility classes where possible */
+.profile-avatar {
+  width: 120px;
+  height: 120px;
+}
+
+.tabs-container {
+  display: flex;
+  gap: var(--space-sm);
+  border-bottom: 2px solid var(--border);
+}
+
+.tab-btn {
+  padding: var(--space-md) var(--space-lg);
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.3s ease;
+}
+
+.tab-btn:hover {
+  color: var(--text-primary);
+}
+
+.tab-btn.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--primary);
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.stat-label {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* History Sub-tabs */
+.history-subtabs {
+  display: flex;
+  gap: var(--space-sm);
+  border-bottom: 2px solid var(--border);
+  margin-bottom: var(--space-lg);
+}
+
+.subtab-btn {
+  padding: var(--space-sm) var(--space-md);
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.3s ease;
+}
+
+.subtab-btn:hover {
+  color: var(--text-primary);
+}
+
+.subtab-btn.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+/* Hover effect utility */
+.hover\:translate-y-\[-4px\]:hover {
+  transform: translateY(-4px);
+}
+
+@media (max-width: 768px) {
+  .tabs-container {
+    overflow-x: auto;
+  }
+
+  .tab-btn {
+    white-space: nowrap;
+    padding: var(--space-md) var(--space-xs);
+  }
+}
+</style>
 

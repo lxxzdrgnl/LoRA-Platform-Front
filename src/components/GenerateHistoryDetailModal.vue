@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
+import JSZip from 'jszip';
 import { api } from '../services/api';
 
 const props = defineProps<{
@@ -12,6 +13,7 @@ const emit = defineEmits(['close', 'deleted']);
 const loading = ref(true);
 const error = ref('');
 const history = ref<any>(null);
+const isZipping = ref(false);
 
 watch(() => props.historyId, async (newId) => {
   if (newId) {
@@ -54,22 +56,113 @@ const copyToClipboard = (text: string) => {
 }
 
 const downloadImage = async (imageUrl: string, historyId: number, imageId: number) => {
+
   try {
+
     const response = await fetch(imageUrl);
+
     if (!response.ok) throw new Error('Network response was not ok.');
+
     const blob = await response.blob();
+
     const url = window.URL.createObjectURL(blob);
+
     const link = document.createElement('a');
+
     link.href = url;
+
     link.download = `blueming_ai_history_${historyId}_${imageId}.png`;
+
     document.body.appendChild(link);
+
     link.click();
+
     document.body.removeChild(link);
+
     window.URL.revokeObjectURL(url);
+
   } catch (error) {
+
     console.error('Download failed:', error);
+
     window.open(imageUrl, '_blank');
+
   }
+
+};
+
+
+
+const downloadAllAsZip = async () => {
+
+    if (!history.value || !history.value.generatedImages || history.value.generatedImages.length === 0) return;
+
+
+
+    isZipping.value = true;
+
+    try {
+
+        const zip = new JSZip();
+
+        
+
+        const imagePromises = history.value.generatedImages.map(async (image: any, index: number) => {
+
+            const response = await fetch(image.s3Url);
+
+            if (!response.ok) {
+
+                console.error(`Failed to fetch image ${index + 1}`);
+
+                return;
+
+            }
+
+            const blob = await response.blob();
+
+            zip.file(`image_${index + 1}.png`, blob);
+
+        });
+
+
+
+        await Promise.all(imagePromises);
+
+
+
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+        
+
+        const link = document.createElement('a');
+
+        link.href = URL.createObjectURL(zipBlob);
+
+        link.download = `blueming_ai_history_${history.value.id}.zip`;
+
+        document.body.appendChild(link);
+
+        link.click();
+
+        document.body.removeChild(link);
+
+        URL.revokeObjectURL(link.href);
+
+
+
+    } catch (error) {
+
+        console.error('Failed to create zip file:', error);
+
+        alert('Failed to create zip file. Please try downloading images individually.');
+
+    } finally {
+
+        isZipping.value = false;
+
+    }
+
 };
 </script>
 
@@ -93,83 +186,102 @@ const downloadImage = async (imageUrl: string, historyId: number, imageId: numbe
         <div v-else-if="error" class="card text-center p-xl text-error bg-red-500/10">
             {{ error }}
         </div>
-        <div v-else-if="history" class="grid grid-cols-2 gap-xl">
-            <!-- Left: Generated Images -->
-            <div class="card">
-                <h2 class="text-2xl font-bold mb-lg gradient-text">Result Images</h2>
-                <div class="images-grid">
-                    <div v-for="image in history.generatedImages" :key="image.id" class="image-item">
-                        <img :src="image.s3Url" alt="Generated image" class="img-cover"/>
-                        <div class="image-actions">
-                            <button class="btn btn-secondary btn-sm flex-1" @click.stop="downloadImage(image.s3Url, history.id, image.id)">
+        <div v-else-if="history">
+            <!-- Multi-image layout -->
+            <template v-if="history.generatedImages && history.generatedImages.length > 1">
+                <div class="grid grid-cols-2 gap-xl">
+                    <!-- Left: Generated Images -->
+                    <div class="card">
+                        <div class="flex justify-between items-center mb-lg">
+                            <h2 class="text-2xl font-bold gradient-text">Result Images</h2>
+                            <button class="btn btn-secondary btn-sm" @click="downloadAllAsZip" :disabled="isZipping">
+                                <span v-if="isZipping">Zipping...</span>
+                                <span v-else>Download All (.zip)</span>
+                            </button>
+                        </div>
+                        <div class="images-grid">
+                            <div v-for="image in history.generatedImages" :key="image.id" class="image-item">
+                                <img :src="image.s3Url" alt="Generated image" class="img-cover"/>
+                                <div class="image-actions">
+                                    <button class="btn btn-secondary btn-sm flex-1" @click.stop="downloadImage(image.s3Url, history.id, image.id)">
+                                        Download
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Details -->
+                    <div class="card">
+                        <h2 class="text-2xl font-bold mb-lg gradient-text">Parameters</h2>
+                        <div class="form-group">
+                            <label class="label">Model Used</label>
+                            <p class="font-medium text-primary">{{ history.modelTitle }}</p>
+                        </div>
+                        <div class="form-group">
+                            <label class="label">Status</label>
+                            <p class="badge" :class="{'badge-success': history.status === 'SUCCESS', 'badge-error': history.status === 'FAILED', 'badge-warning': ['PENDING', 'GENERATING'].includes(history.status)}">{{ history.status }}</p>
+                        </div>
+                        <div class="form-group">
+                            <label class="label">Positive Prompt</label>
+                            <div class="prompt-box"><p>{{ history.prompt }}</p><button class="btn btn-ghost btn-sm" @click="copyToClipboard(history.prompt)">Copy</button></div>
+                        </div>
+                        <div class="form-group">
+                            <label class="label">Negative Prompt</label>
+                            <div class="prompt-box"><p>{{ history.negativePrompt }}</p><button class="btn btn-ghost btn-sm" @click="copyToClipboard(history.negativePrompt)">Copy</button></div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-md">
+                            <div class="form-group"><label class="label">Steps</label><p class="font-medium text-primary">{{ history.steps }}</p></div>
+                            <div class="form-group"><label class="label">Guidance</label><p class="font-medium text-primary">{{ history.guidanceScale }}</p></div>
+                            <div class="form-group"><label class="label">Seed</label><p class="font-medium text-primary">{{ history.seed }}</p></div>
+                        </div>
+                        <div class="mt-auto pt-lg"><button class="btn w-full text-error" @click="deleteHistory" style="background: var(--error-light, rgba(239, 68, 68, 0.1));">Delete Generation</button></div>
+                    </div>
+                </div>
+            </template>
+            <!-- Single-image layout -->
+            <template v-else>
+                <div class="flex flex-col gap-lg">
+                    <div class="w-full rounded-lg overflow-hidden relative group image-item bg-bg-card">
+                        <img v-if="history.generatedImages && history.generatedImages.length > 0" :src="history.generatedImages[0].s3Url" alt="Generated image" class="w-full h-auto object-contain mx-auto" style="max-height: 70vh;" />
+                        <div class="image-actions" v-if="history.generatedImages && history.generatedImages.length > 0">
+                            <button class="btn btn-secondary btn-sm flex-1" @click.stop="downloadImage(history.generatedImages[0].s3Url, history.id, history.generatedImages[0].id)">
                                 Download
                             </button>
                         </div>
                     </div>
-                </div>
-            </div>
-
-            <!-- Right: Details -->
-            <div class="card">
-                <h2 class="text-2xl font-bold mb-lg gradient-text">Parameters</h2>
-                
-                <div class="form-group">
-                    <label class="label">Model Used</label>
-                    <p class="font-medium text-primary">{{ history.modelTitle }}</p>
-                </div>
-
-                <div class="form-group">
-                    <label class="label">Status</label>
-                     <p class="badge" :class="{
-                        'badge-success': history.status === 'SUCCESS',
-                        'badge-error': history.status === 'FAILED',
-                        'badge-warning': ['PENDING', 'GENERATING'].includes(history.status)
-                    }">{{ history.status }}</p>
-                </div>
-
-                <div class="form-group">
-                    <label class="label">Positive Prompt</label>
-                    <div class="prompt-box">
-                        <p>{{ history.prompt }}</p>
-                        <button class="btn btn-ghost btn-sm" @click="copyToClipboard(history.prompt)">Copy</button>
+                    <div class="card">
+                        <h2 class="text-2xl font-bold mb-lg gradient-text">Parameters</h2>
+                        <div class="form-group">
+                            <label class="label">Model Used</label>
+                            <p class="font-medium text-primary">{{ history.modelTitle }}</p>
+                        </div>
+                        <div class="form-group">
+                            <label class="label">Status</label>
+                            <p class="badge" :class="{'badge-success': history.status === 'SUCCESS', 'badge-error': history.status === 'FAILED', 'badge-warning': ['PENDING', 'GENERATING'].includes(history.status)}">{{ history.status }}</p>
+                        </div>
+                        <div class="form-group">
+                            <label class="label">Positive Prompt</label>
+                            <div class="prompt-box"><p>{{ history.prompt }}</p><button class="btn btn-ghost btn-sm" @click="copyToClipboard(history.prompt)">Copy</button></div>
+                        </div>
+                        <div class="form-group">
+                            <label class="label">Negative Prompt</label>
+                            <div class="prompt-box"><p>{{ history.negativePrompt }}</p><button class="btn btn-ghost btn-sm" @click="copyToClipboard(history.negativePrompt)">Copy</button></div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-md">
+                            <div class="form-group"><label class="label">Steps</label><p class="font-medium text-primary">{{ history.steps }}</p></div>
+                            <div class="form-group"><label class="label">Guidance</label><p class="font-medium text-primary">{{ history.guidanceScale }}</p></div>
+                            <div class="form-group"><label class="label">Seed</label><p class="font-medium text-primary">{{ history.seed }}</p></div>
+                        </div>
+                        <div class="mt-auto pt-lg"><button class="btn w-full text-error" @click="deleteHistory" style="background: var(--error-light, rgba(239, 68, 68, 0.1));">Delete Generation</button></div>
                     </div>
                 </div>
-
-                <div class="form-group">
-                    <label class="label">Negative Prompt</label>
-                    <div class="prompt-box">
-                        <p>{{ history.negativePrompt }}</p>
-                        <button class="btn btn-ghost btn-sm" @click="copyToClipboard(history.negativePrompt)">Copy</button>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-3 gap-md">
-                    <div class="form-group">
-                        <label class="label">Steps</label>
-                        <p class="font-medium text-primary">{{ history.steps }}</p>
-                    </div>
-                    <div class="form-group">
-                        <label class="label">Guidance</label>
-                        <p class="font-medium text-primary">{{ history.guidanceScale }}</p>
-                    </div>
-                     <div class="form-group">
-                        <label class="label">Seed</label>
-                        <p class="font-medium text-primary">{{ history.seed }}</p>
-                    </div>
-                </div>
-                
-                <div class="mt-auto pt-lg">
-                    <button class="btn w-full text-error" @click="deleteHistory" style="background: var(--error-light, rgba(239, 68, 68, 0.1));">
-                        Delete Generation
-                    </button>
-                </div>
-            </div>
+            </template>
         </div>
       </div>
     </div>
   </div>
 </template>
-
 <style scoped>
 /* Scoped styles from GenerateModal for consistency */
 .modal-overlay {
