@@ -39,7 +39,9 @@ const fileInput = ref<HTMLInputElement | null>(null); // Explicitly type fileInp
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
-let eventSource: EventSource | null = null;
+let websocket: WebSocket | null = null;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
 onMounted(async () => {
   // Allow unauthenticated users to view the page
@@ -235,42 +237,140 @@ const startTraining = async () => {
 
     statusMessage.value = 'Training started...';
 
-    // 5. Connect to SSE for progress
-    connectToProgressStream();
+    // 5. Connect to WebSocket for progress
+    connectWebSocket();
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to start training';
     isTraining.value = false;
   }
 };
 
-const connectToProgressStream = () => {
-  if (eventSource) {
-    eventSource.close();
+// WebSocket 연결
+const connectWebSocket = () => {
+  if (websocket) {
+    websocket.close();
   }
 
-  eventSource = api.training.streamTrainingProgress((data) => {
-    if (data.status === 'TRAINING' || data.status === 'IN_PROGRESS') {
-      currentEpoch.value = (data.currentEpoch as number) || 0;
-      totalEpochs.value = (data.totalEpochs as number) || epochs.value;
-      statusMessage.value = (data.phase as string) || 'Training...';
-    } else if (data.status === 'COMPLETED') {
-      isTraining.value = false;
-      statusMessage.value = 'Training completed successfully!';
-      if (eventSource) {
-        eventSource.close();
-        eventSource = null;
+  // 타이머 정리
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+
+  const userId = localStorage.getItem('userId') || '0';
+  const wsUrl = `ws://bluemingai.ap-northeast-2.elasticbeanstalk.com/ws/generation?userId=${userId}`;
+
+  console.log('🔌 WebSocket 연결 시도:', wsUrl);
+  statusMessage.value = 'Connecting to training server...';
+
+  websocket = new WebSocket(wsUrl);
+
+  websocket.onopen = () => {
+    console.log('✅ WebSocket 연결 성공');
+
+    // Heartbeat 시작 (30초마다 ping 전송)
+    heartbeatTimer = setInterval(() => {
+      if (websocket && websocket.readyState === WebSocket.OPEN) {
+        try {
+          websocket.send(JSON.stringify({ type: 'ping' }));
+          console.log('💓 Heartbeat 전송');
+        } catch (err) {
+          console.error('❌ Heartbeat 전송 실패:', err);
+        }
       }
-      // Reload training history
-      loadTrainingHistory();
-    } else if (data.status === 'FAILED') {
-      isTraining.value = false;
-      error.value = (data.errorMessage as string) || 'Training failed';
-      if (eventSource) {
-        eventSource.close();
-        eventSource = null;
+    }, 30000); // 30초
+  };
+
+  websocket.onmessage = (event) => {
+    console.log('📨 WebSocket 메시지:', event.data);
+
+    try {
+      const data = JSON.parse(event.data);
+      console.log('📦 파싱된 데이터:', data);
+
+      // Pong 메시지 무시
+      if (data.type === 'pong') {
+        console.log('💓 Pong 수신');
+        return;
       }
+
+      // modelId 필터링 (내 작업만 처리)
+      if (modelId.value && data.modelId && data.modelId !== modelId.value) {
+        console.log('⏭️ 다른 모델의 이벤트 무시:', data.modelId);
+        return;
+      }
+
+      if (data.status === 'SUCCESS') {
+        console.log('✅ 학습 완료!', data);
+        isTraining.value = false;
+        statusMessage.value = 'Training completed successfully!';
+
+        disconnectWebSocket();
+
+        // Reload training history
+        loadTrainingHistory();
+      } else if (data.status === 'FAILED') {
+        console.error('❌ 학습 실패:', data.message);
+        isTraining.value = false;
+        error.value = data.message || 'Training failed';
+        disconnectWebSocket();
+      } else if (data.status === 'LOADING' || data.status === 'PREPROCESSING' || data.status === 'TRAINING' || data.status === 'UPLOADING') {
+        // 진행률 업데이트
+        statusMessage.value = data.message || data.status;
+        console.log(`📊 상태: ${data.status} - ${data.message}`);
+      }
+    } catch (err) {
+      console.error('❌ WebSocket 메시지 파싱 실패:', err, event.data);
     }
-  });
+  };
+
+  websocket.onerror = (evt) => {
+    console.error('❌ WebSocket 에러:', evt);
+    error.value = 'WebSocket 연결 오류';
+  };
+
+  websocket.onclose = (event) => {
+    console.log('🔌 WebSocket 연결 종료:', event.code, event.reason);
+
+    // Heartbeat 타이머 정리
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+
+    // 진행 중인 작업이 있으면 5초 후 재연결
+    if (isTraining.value) {
+      console.log('🔄 5초 후 재연결 시도...');
+      reconnectTimer = setTimeout(() => {
+        console.log('🔄 재연결 시도');
+        connectWebSocket();
+      }, 5000);
+    }
+  };
+};
+
+const disconnectWebSocket = () => {
+  // 재연결 타이머 취소
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+
+  // Heartbeat 타이머 취소
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+
+  if (websocket) {
+    websocket.close();
+    websocket = null;
+    console.log('⏹️ WebSocket 종료');
+  }
 };
 
 const cancelTraining = async () => {
@@ -280,10 +380,7 @@ const cancelTraining = async () => {
     await api.training.deleteTrainingJob(trainingJobId.value);
     isTraining.value = false;
     statusMessage.value = 'Training cancelled';
-    if (eventSource) {
-      eventSource.close();
-      eventSource = null;
-    }
+    disconnectWebSocket();
   } catch (err) {
     console.error('Failed to cancel training:', err);
   }
@@ -313,9 +410,8 @@ const getStatusClass = (status: string) => {
 };
 
 onUnmounted(() => {
-  if (eventSource) {
-    eventSource.close();
-  }
+  // 컴포넌트 언마운트 시 WebSocket 종료
+  disconnectWebSocket();
 });
 </script>
 

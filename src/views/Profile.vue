@@ -152,9 +152,16 @@ const cancelEdit = () => {
 };
 
 const saveProfile = async () => {
+  // 닉네임 검증
+  const trimmedNickname = editForm.value.nickname.trim();
+  if (trimmedNickname.length < 2 || trimmedNickname.length > 10) {
+    alert('닉네임은 2-10자 이내로 입력해주세요.');
+    return;
+  }
+
   try {
     const response = await api.user.updateMyProfile({
-      nickname: editForm.value.nickname,
+      nickname: trimmedNickname,
       profileImageUrl: editForm.value.profileImageUrl || undefined,
     });
     user.value = response.data;
@@ -214,8 +221,11 @@ const saveProfile = async () => {
 
             <template v-else>
               <div class="form-group">
-                <label class="label">Nickname</label>
-                <input v-model="editForm.nickname" type="text" class="input" />
+                <label class="label" style="display: flex; justify-content: space-between; align-items: center;">
+                  <span>Nickname</span>
+                  <span class="text-sm text-muted">{{ editForm.nickname.length }}/10</span>
+                </label>
+                <input v-model="editForm.nickname" type="text" class="input" maxlength="10" />
               </div>
               <div class="form-group">
                 <label class="label">Profile Image URL</label>
