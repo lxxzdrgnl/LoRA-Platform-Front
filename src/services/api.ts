@@ -616,7 +616,7 @@ export const api = {
   },
 
   // ========== Generation ==========
-  generation: {
+  generate: {
     async getOngoingGeneration(): Promise<ApiResponse<GenerationHistoryResponse | null>> {
       const response = await fetch(`${API_BASE_URL}/api/generate/ongoing`, {
         headers: getAuthHeaders(),
@@ -644,7 +644,7 @@ export const api = {
       return handleResponse(response);
     },
 
-    async getMyGenerationHistory(page = 0, size = 20): Promise<ApiResponse<PageResponse<unknown>>> {
+    async getHistoryList(page = 0, size = 20): Promise<ApiResponse<PageResponse<GenerationHistoryResponse>>> {
       const response = await fetch(
         `${API_BASE_URL}/api/generate/history/my?page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
@@ -652,19 +652,27 @@ export const api = {
       return handleResponse(response);
     },
 
-    async getGenerationHistory(historyId: number): Promise<ApiResponse<GenerationHistoryResponse>> {
+    async getHistoryDetail(historyId: number): Promise<ApiResponse<GenerationHistoryResponse>> {
       const response = await fetch(
         `${API_BASE_URL}/api/generate/history/${historyId}`,
-        { headers: { 'Content-Type': 'application/json' } } // 인증 없이 폴링 (백엔드에서 permitAll 설정됨)
+        { headers: getAuthHeaders() }
       );
       return handleResponse(response);
+    },
+
+    async deleteHistory(historyId: number): Promise<ApiResponse<void>> {
+        const response = await fetch(`${API_BASE_URL}/api/generate/history/${historyId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
     },
 
     streamGenerationProgress(onMessage: (data: GenerationProgressResponse) => void): EventSource {
       const url = `${API_BASE_URL}/api/generate/stream`;
       console.log('🔌 SSE 연결 시도:', url);
 
-      const eventSource = new EventSource(url);
+      const eventSource = new EventSource(url, { withCredentials: true });
 
       eventSource.onopen = () => {
         console.log('✅ SSE 연결 성공');

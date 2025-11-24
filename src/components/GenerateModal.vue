@@ -96,7 +96,7 @@ const filteredCommunityModels = computed(() => {
 
 const checkOngoingGeneration = async () => {
   try {
-    const response = await api.generation.getOngoingGeneration();
+    const response = await api.generate.getOngoingGeneration();
 
     if (response.data && response.data.id) {
       // 진행 중인 작업이 있음
@@ -264,7 +264,7 @@ const startGeneration = async () => {
 
     console.log('Sending generation request:', payload);
 
-    const response = await api.generation.generateImage(payload as any);
+    const response = await api.generate.generateImage(payload as any);
     console.log('Generation response:', response);
 
     // historyId 저장

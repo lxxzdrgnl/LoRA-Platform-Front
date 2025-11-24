@@ -3,6 +3,8 @@ import { ref, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import ModelCard from '../components/ModelCard.vue';
 import ModelDetailModal from '../components/ModelDetailModal.vue';
+import GenerateHistoryCard from '../components/GenerateHistoryCard.vue';
+import GenerateHistoryDetailModal from '../components/GenerateHistoryDetailModal.vue';
 import { api, authStore, type UserResponse, type LoraModel } from '../services/api';
 
 const router = useRouter();
@@ -18,6 +20,9 @@ const editForm = ref({
 const showDetailModal = ref(false);
 const selectedModelId = ref<number | null>(null);
 
+const showHistoryDetailModal = ref(false);
+const selectedHistoryId = ref<number | null>(null);
+
 const openModelDetail = (modelId: number) => {
   selectedModelId.value = modelId;
   showDetailModal.value = true;
@@ -28,9 +33,23 @@ const closeModelDetail = () => {
   selectedModelId.value = null;
 };
 
+const openHistoryDetailModal = (historyId: number) => {
+  selectedHistoryId.value = historyId;
+  showHistoryDetailModal.value = true;
+};
+
+const closeHistoryDetailModal = () => {
+  showHistoryDetailModal.value = false;
+  selectedHistoryId.value = null;
+};
+
+const handleHistoryDeleted = (historyId: number) => {
+  generationHistory.value = generationHistory.value.filter(h => h.id !== historyId);
+  closeHistoryDetailModal();
+};
+
 const refreshAllModels = () => {
   loadMyModels();
-  loadFavoriteModels();
   loadLikedModels();
 };
 
@@ -46,7 +65,6 @@ const activeTab = ref<'models' | 'favorites' | 'history'>(getInitialTab());
 const historySubTab = ref<'generate' | 'training'>('generate');
 const loading = ref(true);
 const myModels = ref<LoraModel[]>([]);
-const favoriteModels = ref<LoraModel[]>([]);
 const likedModels = ref<LoraModel[]>([]);
 const generationHistory = ref<any[]>([]);
 const trainingHistory = ref<any[]>([]);
@@ -68,7 +86,6 @@ onMounted(async () => {
 
   await loadUserProfile();
   await loadMyModels();
-  await loadFavoriteModels();
   await loadLikedModels();
   await loadGenerationHistory();
   await loadTrainingHistory();
@@ -99,14 +116,7 @@ const loadMyModels = async () => {
   }
 };
 
-const loadFavoriteModels = async () => {
-  try {
-    const response = await api.community.getFavoriteModels(0, 20);
-    favoriteModels.value = response.data.content;
-  } catch (error) {
-    console.error('Failed to load favorite models:', error);
-  }
-};
+
 
 const loadLikedModels = async () => {
   try {
@@ -121,7 +131,7 @@ const loadLikedModels = async () => {
 
 const loadGenerationHistory = async () => {
   try {
-    const response = await api.generation.getMyGenerationHistory(0, 20);
+    const response = await api.generate.getHistoryList(0, 20);
     generationHistory.value = response.data.content;
   } catch (error) {
     console.error('Failed to load generation history:', error);
@@ -213,7 +223,7 @@ const saveProfile = async () => {
                   <span class="stat-label">Models</span>
                 </div>
                 <div class="stat-item">
-                  <span class="stat-value">{{ likedModels.length + favoriteModels.length }}</span>
+                  <span class="stat-value">{{ likedModels.length }}</span>
                   <span class="stat-label">Favorites</span>
                 </div>
               </div>
@@ -328,33 +338,11 @@ const saveProfile = async () => {
             </div>
           </div>
 
-          <!-- Favorited Models Section -->
-          <div v-if="favoriteModels.length > 0">
-            <h2 class="text-2xl font-bold mb-lg">즐겨찾기한 모델</h2>
-            <div class="grid grid-cols-4 gap-lg">
-              <div
-                v-for="model in favoriteModels"
-                :key="model.id"
-                @click="openModelDetail(model.id)"
-                class="cursor-pointer"
-              >
-                <ModelCard
-                  :id="model.id"
-                  :title="model.title"
-                  :description="model.description"
-                  :thumbnailUrl="model.thumbnailUrl"
-                  :userNickname="model.userNickname"
-                  :likeCount="model.likeCount"
-                  :viewCount="model.viewCount"
-                  :favoriteCount="model.favoriteCount"
-                />
-              </div>
-            </div>
-          </div>
+
 
           <!-- Empty State -->
-          <div v-if="likedModels.length === 0 && favoriteModels.length === 0" class="card text-center p-xl">
-            <p class="text-secondary text-lg">좋아요하거나 즐겨찾기한 모델이 없습니다</p>
+          <div v-if="likedModels.length === 0" class="card text-center p-xl">
+            <p class="text-secondary text-lg">좋아요한 모델이 없습니다</p>
           </div>
         </div>
 
@@ -380,45 +368,13 @@ const saveProfile = async () => {
 
           <!-- Generation History -->
           <div v-if="historySubTab === 'generate'">
-            <div v-if="generationHistory.length" class="grid grid-cols-4 gap-lg">
-              <div v-for="item in generationHistory" :key="item.id" class="card p-0 overflow-hidden relative transition-transform duration-300 hover:translate-y-[-4px] hover:shadow-lg">
-                <!-- Status Badge -->
-                <div v-if="item.status === 'GENERATING'" class="absolute z-10 flex items-center gap-sm px-sm py-xs rounded badge-primary text-white" style="top: var(--space-sm); right: var(--space-sm); backdrop-filter: blur(4px);">
-                  <div class="loading"></div>
-                  <span class="text-xs">생성 중</span>
-                  <span v-if="item.currentStep && item.totalSteps" class="text-xs opacity-75">
-                    {{ item.currentStep }}/{{ item.totalSteps }}
-                  </span>
-                </div>
-                <div v-else-if="item.status === 'FAILED'" class="absolute z-10 badge badge-error text-white" style="top: var(--space-sm); right: var(--space-sm); backdrop-filter: blur(4px);">
-                  생성 실패
-                </div>
-
-                <!-- Generated Images -->
-                <div v-if="item.generatedImages && item.generatedImages.length > 0" class="relative">
-                  <img
-                    :src="item.generatedImages[0].s3Url"
-                    alt="Generated"
-                    class="w-full aspect-square object-cover"
-                  />
-                  <div v-if="item.generatedImages.length > 1" class="absolute badge text-white" style="bottom: var(--space-sm); right: var(--space-sm); background: rgba(0, 0, 0, 0.7);">
-                    +{{ item.generatedImages.length - 1 }}
-                  </div>
-                </div>
-                <div v-else class="w-full aspect-square flex items-center justify-center" style="background: var(--bg-hover);">
-                  <p class="text-sm text-muted text-center">
-                    <span v-if="item.status === 'GENERATING'">이미지 생성 중...</span>
-                    <span v-else>이미지 없음</span>
-                  </p>
-                </div>
-
-                <!-- Info -->
-                <div class="p-md">
-                  <p class="text-sm text-muted mb-xs">{{ new Date(item.createdAt).toLocaleString() }}</p>
-                  <p class="text-sm font-semibold mb-xs truncate">{{ item.modelTitle || 'Unknown Model' }}</p>
-                  <p class="text-sm truncate text-secondary">{{ item.prompt }}</p>
-                </div>
-              </div>
+            <div v-if="generationHistory.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-lg">
+              <GenerateHistoryCard
+                v-for="history in generationHistory"
+                :key="history.id"
+                :history="history"
+                @view-details="openHistoryDetailModal(history.id)"
+              />
             </div>
             <div v-else class="card text-center p-xl">
               <p class="text-secondary text-lg">생성 기록이 없습니다</p>
@@ -486,6 +442,12 @@ const saveProfile = async () => {
     :model-id="selectedModelId" 
     @close="closeModelDetail"
     @model-update="refreshAllModels" 
+  />
+  <GenerateHistoryDetailModal
+    :show="showHistoryDetailModal"
+    :history-id="selectedHistoryId"
+    @close="closeHistoryDetailModal"
+    @deleted="handleHistoryDeleted"
   />
 </template>
 
