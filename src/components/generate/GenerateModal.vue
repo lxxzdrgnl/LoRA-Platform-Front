@@ -460,11 +460,21 @@ const handleAuthCheck = (event: FocusEvent) => {
 };
 
 const copyToClipboard = (text: string, type: 'positive' | 'negative') => {
-  navigator.clipboard.writeText(text);
-  copyStatus.value = type;
-  setTimeout(() => {
-    copyStatus.value = null;
-  }, 1500); // Revert back after 1.5 seconds
+  if (!navigator.clipboard) {
+    console.error('Clipboard API not available. This feature works only in secure contexts (HTTPS or localhost).');
+    alert('Clipboard API not available. Please use a secure connection (HTTPS) or localhost.');
+    return;
+  }
+
+  navigator.clipboard.writeText(text).then(() => {
+    copyStatus.value = type;
+    setTimeout(() => {
+      copyStatus.value = null;
+    }, 1500); // Revert back after 1.5 seconds
+  }).catch(err => {
+    console.error('Failed to copy text: ', err);
+    alert('Failed to copy text. Please check browser permissions.');
+  });
 };
 
 const downloadImage = (url: string, index: number) => {

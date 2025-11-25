@@ -25,6 +25,9 @@ const newComment = ref('');
 const availableTags = ref<any[]>([]);
 const newTagInput = ref('');
 const editingPromptId = ref<number | null>(null);
+const isEditingTags = ref(false);
+const tagsInput = ref('');
+const tagEditingError = ref('');
 const newPrompt = ref({
   title: '',
   prompt: '',
@@ -121,11 +124,21 @@ const toggleCommentLike = async (commentId: number) => {
 };
 
 const copyPrompt = (promptId: number, text: string) => {
-  navigator.clipboard.writeText(text);
-  copiedPromptId.value = promptId;
-  setTimeout(() => {
-    copiedPromptId.value = null;
-  }, 1500); // Revert back after 1.5 seconds
+  if (!navigator.clipboard) {
+    console.error('Clipboard API not available. This feature works only in secure contexts (HTTPS or localhost).');
+    alert('Clipboard API not available. Please use a secure connection (HTTPS) or localhost.');
+    return;
+  }
+
+  navigator.clipboard.writeText(text).then(() => {
+    copiedPromptId.value = promptId;
+    setTimeout(() => {
+      copiedPromptId.value = null;
+    }, 1500); // Revert back after 1.5 seconds
+  }).catch(err => {
+    console.error('Failed to copy text: ', err);
+    alert('Failed to copy text. Please check browser permissions.');
+  });
 };
 
 const openGenerateModal = () => {
@@ -194,6 +207,47 @@ const deleteComment = async (commentId: number) => {
     console.error('Failed to delete comment:', err);
   }
 };
+
+const startEditTags = () => {
+  if (!model.value) return;
+  tagEditingError.value = '';
+  tagsInput.value = model.value.tags.map((tag: any) => tag.name).join(', ');
+  isEditingTags.value = true;
+};
+
+const cancelEditTags = () => {
+  isEditingTags.value = false;
+};
+
+const saveTags = async () => {
+  if (!props.modelId) return;
+  tagEditingError.value = '';
+
+  const newTagNames = tagsInput.value.split(',').map(t => t.trim()).filter(Boolean);
+  const oldTagNames = model.value.tags.map((t: any) => t.name);
+
+  const tagsToAdd = newTagNames.filter(t => !oldTagNames.includes(t));
+  const tagsToRemove = model.value.tags.filter((t: any) => !newTagNames.includes(t.name));
+
+  if (tagsToAdd.length === 0 && tagsToRemove.length === 0) {
+    isEditingTags.value = false;
+    return;
+  }
+
+  try {
+    await Promise.all([
+      ...tagsToAdd.map(tagName => api.tags.addTagToModel(props.modelId!, tagName)),
+      ...tagsToRemove.map((tag: any) => api.tags.removeTagFromModel(props.modelId!, tag.id))
+    ]);
+
+    await fetchModelDetails(props.modelId);
+    isEditingTags.value = false;
+    emit('model-update');
+  } catch (err) {
+    console.error('Failed to update tags', err);
+    tagEditingError.value = err instanceof Error ? err.message : 'An unknown error occurred while saving tags.';
+  }
+};
 </script>
 
 <template>
@@ -229,7 +283,23 @@ const deleteComment = async (commentId: number) => {
                   <p class="font-semibold">{{ model.userNickname }}</p>
                 </div>
                 <div class="flex flex-wrap gap-sm items-center mb-lg">
-                  <span v-for="tag in model.tags" :key="tag.id" class="tag">{{ tag.name }}</span>
+                  <template v-if="isEditingTags">
+                    <div class="w-full">
+                      <label class="label">Tags (comma-separated)</label>
+                      <input v-model="tagsInput" type="text" placeholder="e.g. style, character, concept" class="input w-full mt-xs" />
+                      <div v-if="tagEditingError" class="text-error text-sm mt-sm">{{ tagEditingError }}</div>
+                      <div class="flex gap-sm mt-sm">
+                        <button @click="saveTags" class="btn btn-primary btn-sm">Save</button>
+                        <button @click="cancelEditTags" class="btn btn-secondary btn-sm">Cancel</button>
+                      </div>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <span v-for="tag in model.tags" :key="tag.id" class="tag">{{ tag.name }}</span>
+                    <button v-if="isOwner" @click="startEditTags" class="btn btn-ghost btn-icon btn-sm ml-sm">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                    </button>
+                  </template>
                 </div>
                 <div class="flex gap-sm">
                   <button class="btn btn-icon" @click="toggleLike" :class="model.isLiked ? 'btn-primary' : 'btn-secondary'">
