@@ -331,4 +331,23 @@ const downloadAllAsZip = async () => {
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 768px) {
+  .modal-overlay {
+    padding: var(--space-sm);
+  }
+
+  .modal-body-content {
+    padding: var(--space-md);
+  }
+
+  .images-grid {
+    grid-template-columns: 1fr; /* Single column for images */
+  }
+
+  .images-grid.single-image .image-item {
+    grid-column: span 1; /* Ensure single image also takes one column */
+    min-height: auto; /* Reset min-height for mobile */
+  }
+}
 </style>
