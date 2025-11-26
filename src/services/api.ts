@@ -297,6 +297,46 @@ export const api = {
       return handleResponse(response);
     },
 
+    async getGeneratedImages(modelId: number): Promise<ApiResponse<GeneratedImageResponse[]>> {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/generated-images`, {
+        headers: getAuthHeaders(),
+      });
+      return handleResponse(response);
+    },
+
+    async addSample(modelId: number, generatedImageId: number): Promise<ApiResponse<ModelSample>> {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/samples/${generatedImageId}`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      return handleResponse(response);
+    },
+
+    async deleteSample(modelId: number, sampleId: number): Promise<ApiResponse<void>> {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/samples/${sampleId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      return handleResponse(response);
+    },
+
+    async updateSampleOrder(modelId: number, sampleIds: number[]): Promise<ApiResponse<void>> {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/samples/order`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(sampleIds),
+      });
+      return handleResponse(response);
+    },
+
+    async setPrimarySample(modelId: number, sampleId: number): Promise<ApiResponse<void>> {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/samples/${sampleId}/primary`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+      });
+      return handleResponse(response);
+    },
+
     async getPopularModels(page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
       const response = await fetch(
         `${API_BASE_URL}/api/models/popular?page=${page}&size=${size}`,

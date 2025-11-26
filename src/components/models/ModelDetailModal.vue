@@ -37,6 +37,12 @@ const newPrompt = ref({
 
 const copiedPromptId = ref<number | null>(null);
 
+// Sample editing state
+const isEditingSamples = ref(false);
+const availableImages = ref<any[]>([]);
+const currentSamples = ref<any[]>([]);
+const draggedSampleIndex = ref<number | null>(null);
+
 const isOwner = computed(() => {
   return currentUser.value && model.value && model.value.userId === currentUser.value.id;
 });
@@ -248,6 +254,112 @@ const saveTags = async () => {
     tagEditingError.value = err instanceof Error ? err.message : 'An unknown error occurred while saving tags.';
   }
 };
+
+// Sample editing functions
+const startEditSamples = async () => {
+  if (!props.modelId || !model.value) return;
+
+  try {
+    // Load generated images
+    const response = await api.models.getGeneratedImages(props.modelId);
+    availableImages.value = response.data;
+
+    // Copy current samples
+    currentSamples.value = [...model.value.samples];
+
+    isEditingSamples.value = true;
+  } catch (err) {
+    console.error('Failed to load generated images:', err);
+    alert('Failed to load generated images. Make sure you have generated images with this model.');
+  }
+};
+
+const cancelEditSamples = () => {
+  isEditingSamples.value = false;
+  availableImages.value = [];
+  currentSamples.value = [];
+};
+
+const isSampleSelected = (imageId: number) => {
+  return currentSamples.value.some(s => s.generatedImageId === imageId);
+};
+
+const toggleImageSelection = async (image: any) => {
+  if (!props.modelId) return;
+
+  const existingSampleIndex = currentSamples.value.findIndex(s => s.generatedImageId === image.id);
+
+  if (existingSampleIndex >= 0) {
+    // Remove from samples
+    const sample = currentSamples.value[existingSampleIndex];
+    try {
+      await api.models.deleteSample(props.modelId, sample.id);
+      currentSamples.value.splice(existingSampleIndex, 1);
+    } catch (err) {
+      console.error('Failed to remove sample:', err);
+      alert('Failed to remove sample');
+    }
+  } else {
+    // Add to samples
+    try {
+      const response = await api.models.addSample(props.modelId, image.id);
+      currentSamples.value.push({
+        id: response.data.id,
+        generatedImageId: image.id,
+        imageUrl: image.s3Url,
+        isPrimary: false
+      });
+    } catch (err) {
+      console.error('Failed to add sample:', err);
+      alert('Failed to add sample');
+    }
+  }
+};
+
+const saveSamples = async () => {
+  if (!props.modelId || currentSamples.value.length === 0) return;
+
+  try {
+    // Update order
+    const sampleIds = currentSamples.value.map(s => s.id);
+    await api.models.updateSampleOrder(props.modelId, sampleIds);
+
+    // Set first sample as primary (thumbnail)
+    if (sampleIds.length > 0) {
+      await api.models.setPrimarySample(props.modelId, sampleIds[0]);
+    }
+
+    // Reload model details
+    await fetchModelDetails(props.modelId);
+
+    isEditingSamples.value = false;
+    availableImages.value = [];
+    currentSamples.value = [];
+    emit('model-update');
+  } catch (err) {
+    console.error('Failed to save samples:', err);
+    alert('Failed to save sample order');
+  }
+};
+
+// Drag and drop handlers
+const handleDragStart = (index: number) => {
+  draggedSampleIndex.value = index;
+};
+
+const handleDragOver = (event: DragEvent) => {
+  event.preventDefault();
+};
+
+const handleDrop = (targetIndex: number) => {
+  if (draggedSampleIndex.value === null) return;
+
+  const draggedItem = currentSamples.value[draggedSampleIndex.value];
+  currentSamples.value.splice(draggedSampleIndex.value, 1);
+  currentSamples.value.splice(targetIndex, 0, draggedItem);
+
+  draggedSampleIndex.value = null;
+};
 </script>
 
 <template>
@@ -269,9 +381,74 @@ const saveTags = async () => {
 
               <!-- Sample Images -->
               <section class="samples-section mb-lg">
-                <div class="grid grid-cols-3 gap-lg hide-scrollbar">
+                <div class="flex items-center justify-between mb-md">
+                  <h2 class="text-2xl font-bold">Sample Images</h2>
+                  <button v-if="isOwner && !isEditingSamples" @click="startEditSamples" class="btn btn-sm btn-primary">
+                    Edit Samples
+                  </button>
+                </div>
+
+                <!-- Normal Mode -->
+                <div v-if="!isEditingSamples" class="grid grid-cols-3 gap-lg hide-scrollbar">
                   <div v-for="sample in model.samples" :key="sample.id" class="sample-item">
                     <img :src="sample.imageUrl" alt="Sample" class="img-cover rounded-lg" />
+                  </div>
+                </div>
+
+                <!-- Edit Mode -->
+                <div v-else class="sample-edit-container">
+                  <!-- Current Samples (Draggable) -->
+                  <div class="mb-lg">
+                    <h3 class="text-lg font-semibold mb-md">Current Samples (Drag to reorder - first image is the thumbnail)</h3>
+                    <div v-if="currentSamples.length === 0" class="text-center p-lg text-muted">
+                      No samples selected. Select images from below.
+                    </div>
+                    <div v-else class="grid grid-cols-3 gap-md">
+                      <div
+                        v-for="(sample, index) in currentSamples"
+                        :key="sample.id"
+                        class="sample-item-draggable"
+                        :class="{ 'sample-primary': index === 0 }"
+                        draggable="true"
+                        @dragstart="handleDragStart(index)"
+                        @dragover="handleDragOver"
+                        @drop="handleDrop(index)"
+                      >
+                        <img :src="sample.imageUrl" alt="Sample" class="img-cover rounded-lg cursor-move" />
+                        <div v-if="index === 0" class="badge badge-primary primary-badge">Thumbnail</div>
+                        <div class="sample-order-badge">{{ index + 1 }}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Available Images (Selectable) -->
+                  <div class="mb-lg">
+                    <h3 class="text-lg font-semibold mb-md">Generated Images (Click to add/remove)</h3>
+                    <div v-if="availableImages.length === 0" class="text-center p-lg text-muted">
+                      No generated images found. Generate images with this model first.
+                    </div>
+                    <div v-else class="grid grid-cols-4 gap-sm available-images-grid hide-scrollbar">
+                      <div
+                        v-for="image in availableImages"
+                        :key="image.id"
+                        class="available-image-item"
+                        :class="{ 'selected': isSampleSelected(image.id) }"
+                        @click="toggleImageSelection(image)"
+                      >
+                        <img :src="image.s3Url" alt="Generated" class="img-cover rounded" />
+                        <div v-if="isSampleSelected(image.id)" class="checkmark">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Action Buttons -->
+                  <div class="flex gap-sm">
+                    <button @click="saveSamples" class="btn btn-primary">Save</button>
+                    <button @click="cancelEditSamples" class="btn btn-secondary">Cancel</button>
                   </div>
                 </div>
               </section>
@@ -532,5 +709,99 @@ const saveTags = async () => {
 }
 .btn-close:hover {
   color: var(--text-primary);
+}
+
+/* ========== Sample Editing Styles ========== */
+.sample-edit-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+}
+
+.sample-item-draggable {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--border);
+  transition: all 0.3s ease;
+  cursor: move;
+}
+
+.sample-item-draggable:hover {
+  border-color: var(--primary);
+  transform: scale(1.02);
+}
+
+.sample-item-draggable.sample-primary {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+.sample-order-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.primary-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+}
+
+.available-images-grid {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.available-image-item {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--border);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.available-image-item:hover {
+  border-color: var(--primary);
+  transform: scale(1.05);
+}
+
+.available-image-item.selected {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+.available-image-item .checkmark {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: var(--primary);
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-md);
+}
+
+.cursor-move {
+  cursor: move;
 }
 </style>
