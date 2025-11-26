@@ -154,6 +154,25 @@ const openGenerateModal = () => {
 };
 
 const closeModal = () => {
+  // Reset all editing states
+  isEditingSamples.value = false;
+  isEditingTags.value = false;
+  editingPromptId.value = null;
+
+  // Reset editing data
+  resetNewPrompt();
+  tagsInput.value = '';
+  tagEditingError.value = '';
+  currentSamples.value = [];
+  availableImages.value = [];
+  draggedSampleIndex.value = null;
+
+  // Reset model data and state
+  model.value = null;
+  comments.value = [];
+  loading.value = true;
+  error.value = '';
+
   emit('close');
 };
 
