@@ -19,7 +19,8 @@ const selectedModel = ref<ModelDetailResponse | null>(null); // Changed type to 
 
 // 예시 프롬프트
 const examplePrompt = ref<{ prompt: string; negativePrompt: string } | null>(null);
-const copyStatus = ref<'positive' | 'negative' | null>(null);
+const positiveCopied = ref(false);
+const negativeCopied = ref(false);
 
 // 모달 상태
 const showModelModal = ref(false);
@@ -467,10 +468,17 @@ const copyToClipboard = (text: string, type: 'positive' | 'negative') => {
   }
 
   navigator.clipboard.writeText(text).then(() => {
-    copyStatus.value = type;
-    setTimeout(() => {
-      copyStatus.value = null;
-    }, 1500); // Revert back after 1.5 seconds
+    if (type === 'positive') {
+      positiveCopied.value = true;
+      setTimeout(() => {
+        positiveCopied.value = false;
+      }, 1500);
+    } else {
+      negativeCopied.value = true;
+      setTimeout(() => {
+        negativeCopied.value = false;
+      }, 1500);
+    }
   }).catch(err => {
     console.error('Failed to copy text: ', err);
     alert('Failed to copy text. Please check browser permissions.');
@@ -538,7 +546,7 @@ onUnmounted(() => {
                   <div class="flex items-center justify-between mb-sm">
                     <span class="text-sm text-secondary">Example Prompt</span>
                     <button class="btn btn-ghost btn-sm" @click="copyToClipboard(examplePrompt.prompt, 'positive')">
-                      {{ copyStatus === 'positive' ? 'Copied!' : 'Copy' }}
+                      {{ positiveCopied ? 'Copied!' : 'Copy' }}
                     </button>
                   </div>
                   <p class="text-sm text-muted line-clamp-2">{{ examplePrompt.prompt }}</p>
@@ -554,7 +562,7 @@ onUnmounted(() => {
                   <div class="flex items-center justify-between mb-sm">
                     <span class="text-sm text-secondary">Example Negative Prompt</span>
                     <button class="btn btn-ghost btn-sm" @click="copyToClipboard(examplePrompt.negativePrompt, 'negative')">
-                      {{ copyStatus === 'negative' ? 'Copied!' : 'Copy' }}
+                      {{ negativeCopied ? 'Copied!' : 'Copy' }}
                     </button>
                   </div>
                   <p class="text-sm text-muted line-clamp-2">{{ examplePrompt.negativePrompt }}</p>

@@ -626,6 +626,31 @@ body {
   margin-bottom: var(--space-lg);
 }
 
+.checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--primary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  transition: all 0.2s ease;
+}
+
+.checkbox:checked {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+.checkbox:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.checkbox:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ========== Badges & Tags ========== */
 .badge {
   display: inline-flex;
@@ -1040,6 +1065,11 @@ body {
   .grid-cols-3,
   .grid-cols-4 {
     grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+
+  .container,
+  .container-sm {
+    padding: 0 var(--space-sm);
   }
 
   .flex-col-mobile {

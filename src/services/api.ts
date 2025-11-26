@@ -574,6 +574,7 @@ export const api = {
       totalEpochs: number;
       modelName: string;
       trainingImageUrls: string[];
+      learningRate?: number; // Added learningRate
       callbackBaseUrl?: string;
     }): Promise<ApiResponse<Record<string, unknown>>> {
       const response = await fetch(`${API_BASE_URL}/api/training/jobs/${jobId}/start`, {
