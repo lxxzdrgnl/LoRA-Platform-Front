@@ -15,7 +15,7 @@ const emit = defineEmits(['close', 'open-generate', 'model-update']);
 
 const loading = ref(true);
 const error = ref('');
-const isEditing = ref(false);
+const isEditingModel = ref(false);
 const currentUser = ref<any>(null);
 
 const model = ref<any>(null);
@@ -157,6 +157,7 @@ const closeModal = () => {
   // Reset all editing states
   isEditingSamples.value = false;
   isEditingTags.value = false;
+  isEditingModel.value = false;
   editingPromptId.value = null;
 
   // Reset editing data
@@ -448,6 +449,27 @@ const toggleVisibility = async () => {
     alert('공개 상태 변경에 실패했습니다.');
   }
 };
+
+const deleteModel = async () => {
+  if (!props.modelId || !model.value) return;
+
+  const confirmMessage = `정말로 "${model.value.title}" 모델을 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없으며, 모든 관련 데이터(샘플, 프롬프트, 댓글 등)가 함께 삭제됩니다.`;
+
+  if (!confirm(confirmMessage)) return;
+
+  // Double confirmation for safety
+  if (!confirm('정말로 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.')) return;
+
+  try {
+    await api.models.deleteModel(props.modelId);
+    alert('모델이 성공적으로 삭제되었습니다.');
+    emit('model-update');
+    closeModal();
+  } catch (err) {
+    console.error('Failed to delete model:', err);
+    alert('모델 삭제에 실패했습니다.');
+  }
+};
 </script>
 
 <template>
@@ -567,12 +589,32 @@ const toggleVisibility = async () => {
               <!-- Model Info -->
               <div class="model-info mb-lg">
                 <p class="text-lg text-secondary mb-md">{{ model.description }}</p>
-                <div class="flex items-center gap-md mb-lg">
+                <div class="flex items-center justify-between mb-lg">
                   <p class="font-semibold">{{ model.userNickname }}</p>
+                  <div v-if="isOwner && !isEditingModel" class="flex items-center gap-sm">
+                    <div class="flex items-center gap-xs">
+                      <svg v-if="model.isPublic" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-success">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                      <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                        <line x1="1" y1="1" x2="23" y2="23"></line>
+                      </svg>
+                      <span class="text-sm font-semibold" :class="model.isPublic ? 'text-success' : 'text-muted'">
+                        {{ model.isPublic ? '공개' : '비공개' }}
+                      </span>
+                    </div>
+                    <button @click="isEditingModel = true" class="btn btn-ghost btn-icon btn-sm">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                      </svg>
+                    </button>
+                  </div>
                 </div>
 
                 <!-- Visibility Status and Toggle -->
-                <div v-if="isOwner" class="visibility-section mb-lg">
+                <div v-if="isOwner && isEditingModel" class="visibility-section mb-lg">
                   <div class="flex items-center justify-between p-md rounded-lg" style="background: var(--bg-hover); border: 1px solid var(--border);">
                     <div class="flex items-center gap-md">
                       <div class="visibility-icon">
@@ -592,17 +634,39 @@ const toggleVisibility = async () => {
                         </p>
                       </div>
                     </div>
-                    <button
-                      @click="toggleVisibility"
-                      class="btn btn-sm"
-                      :class="model.isPublic ? 'btn-secondary' : 'btn-primary'"
-                    >
-                      {{ model.isPublic ? '비공개로 전환' : '공개하기' }}
-                    </button>
+                    <div class="flex gap-sm">
+                      <button
+                        @click="deleteModel"
+                        class="btn btn-sm btn-secondary text-error"
+                        style="border-color: var(--error, #ef4444);"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <polyline points="3 6 5 6 21 6"></polyline>
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                          <line x1="10" y1="11" x2="10" y2="17"></line>
+                          <line x1="14" y1="11" x2="14" y2="17"></line>
+                        </svg>
+                        삭제
+                      </button>
+                      <button
+                        @click="toggleVisibility"
+                        class="btn btn-sm"
+                        :class="model.isPublic ? 'btn-secondary' : 'btn-primary'"
+                      >
+                        {{ model.isPublic ? '비공개로 전환' : '공개하기' }}
+                      </button>
+                    </div>
                   </div>
                   <p v-if="!model.isPublic && (!model.samples || model.samples.length === 0)" class="text-sm text-warning mt-sm">
                     ⚠️ 샘플 이미지를 추가해야 모델을 공개할 수 있습니다
                   </p>
+                </div>
+
+                <!-- Edit Mode Cancel Button -->
+                <div v-if="isOwner && isEditingModel" class="mb-lg">
+                  <button @click="isEditingModel = false" class="btn btn-secondary btn-sm">
+                    완료
+                  </button>
                 </div>
                 <div class="flex flex-wrap gap-sm items-center mb-lg">
                   <template v-if="isEditingTags">
@@ -1086,14 +1150,15 @@ const toggleVisibility = async () => {
 
 /* Mobile responsive for visibility section */
 @media (max-width: 768px) {
-  .visibility-section .flex {
+  .visibility-section > div {
     flex-direction: column;
     align-items: flex-start;
     gap: var(--space-md);
   }
 
   .visibility-section .btn {
-    width: 100%;
+    flex: 1;
+    min-width: auto;
   }
 }
 </style>
