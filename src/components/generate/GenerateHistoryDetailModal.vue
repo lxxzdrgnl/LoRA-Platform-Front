@@ -249,7 +249,7 @@ const downloadAllAsZip = async () => {
 
 .images-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr));
   gap: var(--space-lg);
 }
 
@@ -271,6 +271,10 @@ const downloadAllAsZip = async () => {
   height: 100%;
   object-fit: cover;
   transition: transform 0.3s ease;
+  /* Prevent long-press context menu on mobile */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .image-item:hover .img-cover {
@@ -296,6 +300,13 @@ const downloadAllAsZip = async () => {
 
 .image-item:hover .content-overlay {
   opacity: 1;
+}
+
+/* Mobile: Always show overlay on touch devices */
+@media (hover: none) and (pointer: coarse) {
+  .content-overlay {
+    opacity: 1;
+  }
 }
 
 .overlay-top {
@@ -342,12 +353,21 @@ const downloadAllAsZip = async () => {
   }
 
   .images-grid {
-    grid-template-columns: 1fr; /* Single column for images */
+    grid-template-columns: 1fr !important; /* Force single column for images on mobile */
+    gap: var(--space-md);
   }
 
   .images-grid.single-image .image-item {
     grid-column: span 1; /* Ensure single image also takes one column */
     min-height: auto; /* Reset min-height for mobile */
+  }
+
+  .image-item {
+    min-height: 250px; /* Ensure minimum height on mobile */
+  }
+
+  .grid-cols-3 {
+    grid-template-columns: 1fr !important; /* Force single column for parameter grid */
   }
 }
 </style>

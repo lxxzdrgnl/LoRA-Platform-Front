@@ -712,6 +712,13 @@ const handleDrop = (targetIndex: number) => {
   .btn-icon {
     padding: 8px; /* Smaller padding for icon buttons on mobile */
   }
+
+  /* Fix available images grid to show 2 columns on mobile */
+  .available-images-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: var(--space-sm) !important;
+    max-height: 400px;
+  }
 }
 
 .btn-close {
