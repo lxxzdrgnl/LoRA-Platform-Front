@@ -1,18 +1,59 @@
 <script setup lang="ts">
-import type { GenerationHistoryResponse } from '../../services/api';
+import { ref, watch, onMounted, onUnmounted } from 'vue';
+import type { GenerationHistoryResponse, AvailableModelResponse } from '../../services/api';
 
 interface Props {
   history: GenerationHistoryResponse[];
+  availableModels: AvailableModelResponse[];
   loading?: boolean;
+  hasMore?: boolean;
 }
 
 interface Emits {
   (e: 'openDetail', historyId: number): void;
   (e: 'download', event: Event, imageUrl: string, historyId: number): void;
+  (e: 'loadMore'): void;
+  (e: 'filterChange', modelId: number | null): void;
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
+
+const selectedModelId = ref<number | null>(null);
+const loadMoreTrigger = ref<HTMLElement | null>(null);
+let observer: IntersectionObserver | null = null;
+
+// Emit filter change when selectedModelId changes
+watch(selectedModelId, (newModelId) => {
+  emit('filterChange', newModelId);
+});
+
+// Setup Intersection Observer for infinite scroll
+onMounted(() => {
+  observer = new IntersectionObserver(
+    (entries) => {
+      const entry = entries[0];
+      if (entry.isIntersecting && props.hasMore && !props.loading) {
+        console.log('🔄 Infinite scroll triggered - loading more');
+        loadMore();
+      }
+    },
+    {
+      rootMargin: '200px', // Start loading 200px before reaching the trigger
+      threshold: 0.1
+    }
+  );
+
+  if (loadMoreTrigger.value) {
+    observer.observe(loadMoreTrigger.value);
+  }
+});
+
+onUnmounted(() => {
+  if (observer) {
+    observer.disconnect();
+  }
+});
 
 const openHistoryDetailModal = (historyId: number) => {
   emit('openDetail', historyId);
@@ -21,12 +62,27 @@ const openHistoryDetailModal = (historyId: number) => {
 const downloadImage = (event: Event, imageUrl: string, historyId: number) => {
   emit('download', event, imageUrl, historyId);
 };
+
+const loadMore = () => {
+  emit('loadMore');
+};
 </script>
 
 <template>
   <div>
+    <!-- Model Filter -->
+    <div v-if="availableModels.length > 0" class="filter-container mb-lg">
+      <label class="filter-label">모델 필터:</label>
+      <select v-model="selectedModelId" class="filter-select">
+        <option :value="null">전체 모델</option>
+        <option v-for="model in availableModels" :key="model.id" :value="model.id">
+          {{ model.title }}
+        </option>
+      </select>
+    </div>
+
     <!-- Loading State -->
-    <div v-if="loading" class="flex justify-center p-xl">
+    <div v-if="loading && history.length === 0" class="flex justify-center p-xl">
       <div class="loading"></div>
     </div>
 
@@ -76,14 +132,86 @@ const downloadImage = (event: Event, imageUrl: string, historyId: number) => {
       </div>
     </div>
 
+    <!-- Infinite Scroll Trigger -->
+    <div ref="loadMoreTrigger" class="load-more-trigger"></div>
+
+    <!-- Loading More State -->
+    <div v-if="loading && history.length > 0" class="flex justify-center p-lg">
+      <div class="loading"></div>
+      <p class="text-sm text-secondary ml-md">더 많은 항목을 불러오는 중...</p>
+    </div>
+
+    <!-- End of List Message -->
+    <div v-if="!hasMore && history.length > 0" class="end-message">
+      <p class="text-sm text-secondary">모든 항목을 불러왔습니다</p>
+    </div>
+
     <!-- Empty State -->
-    <div v-else class="card text-center p-xl">
-      <p class="text-secondary text-lg">생성 기록이 없습니다</p>
+    <div v-else-if="history.length === 0 && !loading" class="card text-center p-xl">
+      <p class="text-secondary text-lg">
+        {{ selectedModelId ? '선택한 모델의 생성 기록이 없습니다' : '생성 기록이 없습니다' }}
+      </p>
     </div>
   </div>
 </template>
 
 <style scoped>
+.filter-container {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.filter-label {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.filter-select {
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 200px;
+}
+
+.filter-select:hover {
+  border-color: var(--primary);
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.1);
+}
+
+.load-more-trigger {
+  height: 1px;
+  width: 100%;
+  margin-top: var(--space-lg);
+}
+
+.end-message {
+  text-align: center;
+  margin-top: var(--space-lg);
+  margin-bottom: var(--space-lg);
+  padding: var(--space-md);
+  color: var(--text-secondary);
+}
+
+.info-message {
+  text-align: center;
+  margin-top: var(--space-lg);
+  padding: var(--space-md);
+  background: var(--surface-secondary);
+  border-radius: var(--radius-md);
+}
+
 .history-card {
   overflow: hidden;
   padding: 0; /* Override default card padding */

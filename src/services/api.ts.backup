@@ -175,11 +175,6 @@ export interface GenerationHistoryResponse {
   createdAt: string;
 }
 
-export interface AvailableModelResponse {
-  id: number;
-  title: string;
-}
-
 export interface GenerationProgressResponse {
   status: string; // IN_PROGRESS, SUCCESS, FAILED
   current_step?: number;
@@ -387,7 +382,7 @@ export const api = {
   // ========== Models ==========
   models: {
     async getPublicModels(page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
-      const response = await authenticatedFetch(
+      const response = await fetch(
         `${API_BASE_URL}/api/models?page=${page}&size=${size}&sort=createdAt,DESC`,
         { headers: getAuthHeaders() }
       );
@@ -395,14 +390,14 @@ export const api = {
     },
 
     async getGeneratedImages(modelId: number): Promise<ApiResponse<GeneratedImageResponse[]>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/models/${modelId}/generated-images`, {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/generated-images`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
     },
 
     async addSample(modelId: number, generatedImageId: number): Promise<ApiResponse<ModelSample>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/models/${modelId}/samples/${generatedImageId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/samples/${generatedImageId}`, {
         method: 'POST',
         headers: getAuthHeaders(),
       });
@@ -410,7 +405,7 @@ export const api = {
     },
 
     async deleteSample(modelId: number, sampleId: number): Promise<ApiResponse<void>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/models/${modelId}/samples/${sampleId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/samples/${sampleId}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
@@ -418,7 +413,7 @@ export const api = {
     },
 
     async updateSampleOrder(modelId: number, sampleIds: number[]): Promise<ApiResponse<void>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/models/${modelId}/samples/order`, {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/samples/order`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify(sampleIds),
@@ -427,7 +422,7 @@ export const api = {
     },
 
     async setPrimarySample(modelId: number, sampleId: number): Promise<ApiResponse<void>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/models/${modelId}/samples/${sampleId}/primary`, {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/samples/${sampleId}/primary`, {
         method: 'PUT',
         headers: getAuthHeaders(),
       });
@@ -435,7 +430,7 @@ export const api = {
     },
 
     async getPopularModels(page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
-      const response = await authenticatedFetch(
+      const response = await fetch(
         `${API_BASE_URL}/api/models/popular?page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
@@ -443,14 +438,14 @@ export const api = {
     },
 
     async getModelDetail(modelId: number): Promise<ApiResponse<ModelDetailResponse>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/models/${modelId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
     },
 
     async getMyModels(page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
-      const response = await authenticatedFetch(
+      const response = await fetch(
         `${API_BASE_URL}/api/models/my?page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
@@ -464,7 +459,7 @@ export const api = {
       style?: string;
       isPublic: boolean;
     }): Promise<ApiResponse<LoraModel>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/models`, {
+      const response = await fetch(`${API_BASE_URL}/api/models`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
@@ -482,7 +477,7 @@ export const api = {
         isPublic: boolean;
       }>
     ): Promise<ApiResponse<LoraModel>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/models/${modelId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
@@ -491,7 +486,7 @@ export const api = {
     },
 
     async deleteModel(modelId: number): Promise<ApiResponse<void>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/models/${modelId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
@@ -499,7 +494,7 @@ export const api = {
     },
 
     async searchModels(query: string, page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
-      const response = await authenticatedFetch(
+      const response = await fetch(
         `${API_BASE_URL}/api/models/search?query=${encodeURIComponent(query)}&page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
@@ -508,7 +503,7 @@ export const api = {
 
     async filterByTags(tags: string[], page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
       const tagParams = tags.map(tag => `tags=${encodeURIComponent(tag)}`).join('&');
-      const response = await authenticatedFetch(
+      const response = await fetch(
         `${API_BASE_URL}/api/models/filter?${tagParams}&page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
@@ -519,7 +514,7 @@ export const api = {
   // ========== Community ==========
   community: {
     async toggleLike(modelId: number): Promise<ApiResponse<{ liked: boolean }>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/models/${modelId}/like`, {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/like`, {
         method: 'POST',
         headers: getAuthHeaders(),
       });
@@ -527,7 +522,7 @@ export const api = {
     },
 
     async toggleFavorite(modelId: number): Promise<ApiResponse<{ favorited: boolean }>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/models/${modelId}/favorite`, {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/favorite`, {
         method: 'POST',
         headers: getAuthHeaders(),
       });
@@ -535,7 +530,7 @@ export const api = {
     },
 
     async toggleCommentLike(modelId: number, commentId: number): Promise<ApiResponse<{ isLiked: boolean }>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/models/${modelId}/comments/${commentId}/like`, {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/comments/${commentId}/like`, {
         method: 'POST',
         headers: getAuthHeaders(),
       });
@@ -543,7 +538,7 @@ export const api = {
     },
 
     async getComments(modelId: number, page = 0, size = 20): Promise<ApiResponse<PageResponse<CommentResponse>>> {
-      const response = await authenticatedFetch(
+      const response = await fetch(
         `${API_BASE_URL}/api/models/${modelId}/comments?page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
@@ -551,7 +546,7 @@ export const api = {
     },
 
     async createComment(modelId: number, content: string, parentCommentId?: number): Promise<ApiResponse<CommentResponse>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/models/${modelId}/comments`, {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/comments`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ content, parentCommentId }),
@@ -560,7 +555,7 @@ export const api = {
     },
 
     async deleteComment(modelId: number, commentId: number): Promise<ApiResponse<void>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/models/${modelId}/comments/${commentId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/models/${modelId}/comments/${commentId}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
@@ -568,7 +563,7 @@ export const api = {
     },
 
     async getFavoriteModels(page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
-      const response = await authenticatedFetch(
+      const response = await fetch(
         `${API_BASE_URL}/api/models/likes?page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
@@ -576,7 +571,7 @@ export const api = {
     },
 
     async getLikedModels(page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
-      const response = await authenticatedFetch(
+      const response = await fetch(
         `${API_BASE_URL}/api/models/likes?page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
@@ -587,21 +582,21 @@ export const api = {
   // ========== Tags ==========
   tags: {
     async getAllTags(): Promise<ApiResponse<TagResponse[]>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/tags`, {
+      const response = await fetch(`${API_BASE_URL}/api/tags`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
     },
 
     async getPopularTags(): Promise<ApiResponse<TagResponse[]>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/tags/popular`, {
+      const response = await fetch(`${API_BASE_URL}/api/tags/popular`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
     },
 
     async searchTags(keyword: string): Promise<ApiResponse<TagResponse[]>> {
-      const response = await authenticatedFetch(
+      const response = await fetch(
         `${API_BASE_URL}/api/tags/search?keyword=${encodeURIComponent(keyword)}`,
         { headers: getAuthHeaders() }
       );
@@ -609,7 +604,7 @@ export const api = {
     },
 
     async addTagToModel(modelId: number, tagName: string, category?: string): Promise<ApiResponse<void>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/tags/models/${modelId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/tags/models/${modelId}`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ tagName, category }),
@@ -618,7 +613,7 @@ export const api = {
     },
 
     async removeTagFromModel(modelId: number, tagId: number): Promise<ApiResponse<void>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/tags/models/${modelId}/tags/${tagId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/tags/models/${modelId}/tags/${tagId}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
@@ -629,14 +624,14 @@ export const api = {
   // ========== User ==========
   user: {
     async getMyProfile(): Promise<ApiResponse<UserResponse>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/users/me`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/me`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
     },
 
     async updateMyProfile(data: { nickname?: string; profileImageUrl?: string }): Promise<ApiResponse<UserResponse>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/users/me`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/me`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
@@ -645,7 +640,7 @@ export const api = {
     },
 
     async getUserProfile(userId: number): Promise<ApiResponse<UserResponse>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/users/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
@@ -655,7 +650,7 @@ export const api = {
   // ========== Upload ==========
   upload: {
     async getPresignedUrls(fileNames: string[]): Promise<ApiResponse<{ uploadUrls: string[]; downloadUrls: string[] }>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/training/upload-urls`, {
+      const response = await fetch(`${API_BASE_URL}/api/training/upload-urls`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ fileNames }),
@@ -664,7 +659,6 @@ export const api = {
     },
 
     async uploadToS3(presignedUrl: string, file: File): Promise<void> {
-      // Direct fetch for S3 upload (no auth needed for presigned URLs)
       const response = await fetch(presignedUrl, {
         method: 'PUT',
         body: file,
@@ -692,7 +686,7 @@ export const api = {
       baseModel?: string;
       isPublic?: boolean;
     }): Promise<ApiResponse<LoraModel>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/models`, {
+      const response = await fetch(`${API_BASE_URL}/api/models`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
@@ -701,7 +695,7 @@ export const api = {
     },
 
     async createTrainingJob(modelId: number): Promise<ApiResponse<TrainingJobResponse>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/training/models/${modelId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/training/models/${modelId}`, {
         method: 'POST',
         headers: getAuthHeaders(),
       });
@@ -715,7 +709,7 @@ export const api = {
       learningRate?: number; // Added learningRate
       callbackBaseUrl?: string;
     }): Promise<ApiResponse<Record<string, unknown>>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/training/jobs/${jobId}/start`, {
+      const response = await fetch(`${API_BASE_URL}/api/training/jobs/${jobId}/start`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(config),
@@ -724,21 +718,21 @@ export const api = {
     },
 
     async getTrainingJob(jobId: number): Promise<ApiResponse<TrainingJobResponse>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/training/jobs/${jobId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/training/jobs/${jobId}`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
     },
 
     async getMyTrainingJobs(): Promise<ApiResponse<TrainingJobResponse[]>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/training/my`, {
+      const response = await fetch(`${API_BASE_URL}/api/training/my`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
     },
 
     async deleteTrainingJob(jobId: number): Promise<ApiResponse<void>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/training/jobs/${jobId}/fail`, {
+      const response = await fetch(`${API_BASE_URL}/api/training/jobs/${jobId}/fail`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ error: 'User cancelled' }),
@@ -747,7 +741,6 @@ export const api = {
     },
 
     streamTrainingProgress(onMessage: (data: Record<string, unknown>) => void): EventSource {
-      // EventSource doesn't support custom headers, so no auto-refresh here
       const eventSource = new EventSource(`${API_BASE_URL}/api/training/stream`);
       eventSource.onmessage = (event) => {
         onMessage(JSON.parse(event.data));
@@ -759,7 +752,7 @@ export const api = {
   // ========== Generation ==========
   generate: {
     async getOngoingGeneration(): Promise<ApiResponse<GenerationHistoryResponse | null>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/generate/ongoing`, {
+      const response = await fetch(`${API_BASE_URL}/api/generate/ongoing`, {
         headers: getAuthHeaders(),
       });
       return handleResponse(response);
@@ -776,7 +769,7 @@ export const api = {
       seed?: number;
     }): Promise<ApiResponse<Record<string, unknown>>> {
       console.log('API Request - POST /api/generate:', data);
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/generate`, {
+      const response = await fetch(`${API_BASE_URL}/api/generate`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
@@ -785,31 +778,16 @@ export const api = {
       return handleResponse(response);
     },
 
-    async getHistoryList(page = 0, size = 20, modelId?: number): Promise<ApiResponse<PageResponse<GenerationHistoryResponse>>> {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        size: size.toString(),
-      });
-      if (modelId !== undefined && modelId !== null) {
-        params.append('modelId', modelId.toString());
-      }
-      const response = await authenticatedFetch(
-        `${API_BASE_URL}/api/generate/history/my?${params.toString()}`,
-        { headers: getAuthHeaders() }
-      );
-      return handleResponse(response);
-    },
-
-    async getAvailableModels(): Promise<ApiResponse<AvailableModelResponse[]>> {
-      const response = await authenticatedFetch(
-        `${API_BASE_URL}/api/generate/history/available-models`,
+    async getHistoryList(page = 0, size = 20): Promise<ApiResponse<PageResponse<GenerationHistoryResponse>>> {
+      const response = await fetch(
+        `${API_BASE_URL}/api/generate/history/my?page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
       return handleResponse(response);
     },
 
     async getHistoryDetail(historyId: number): Promise<ApiResponse<GenerationHistoryResponse>> {
-      const response = await authenticatedFetch(
+      const response = await fetch(
         `${API_BASE_URL}/api/generate/history/${historyId}`,
         { headers: getAuthHeaders() }
       );
@@ -817,7 +795,7 @@ export const api = {
     },
 
     async deleteHistory(historyId: number): Promise<ApiResponse<void>> {
-        const response = await authenticatedFetch(`${API_BASE_URL}/api/generate/history/${historyId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/generate/history/${historyId}`, {
             method: 'DELETE',
             headers: getAuthHeaders(),
         });
@@ -825,7 +803,6 @@ export const api = {
     },
 
     streamGenerationProgress(onMessage: (data: GenerationProgressResponse) => void): EventSource {
-      // EventSource doesn't support custom headers, so no auto-refresh here
       const url = `${API_BASE_URL}/api/generate/stream`;
       console.log('🔌 SSE 연결 시도:', url);
 
@@ -859,7 +836,7 @@ export const api = {
   // ========== Search ==========
   search: {
     async search(query: string, page = 0, size = 20): Promise<ApiResponse<SearchAllResponse>> {
-      const response = await authenticatedFetch(
+      const response = await fetch(
         `${API_BASE_URL}/api/search?query=${encodeURIComponent(query)}&page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
@@ -867,7 +844,7 @@ export const api = {
     },
 
     async searchModels(query: string, page = 0, size = 20): Promise<ApiResponse<PageResponse<LoraModel>>> {
-      const response = await authenticatedFetch(
+      const response = await fetch(
         `${API_BASE_URL}/api/search/models?query=${encodeURIComponent(query)}&page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
@@ -875,7 +852,7 @@ export const api = {
     },
 
     async searchUsers(query: string, page = 0, size = 20): Promise<ApiResponse<PageResponse<SearchUserResponse>>> {
-      const response = await authenticatedFetch(
+      const response = await fetch(
         `${API_BASE_URL}/api/search/users?query=${encodeURIComponent(query)}&page=${page}&size=${size}`,
         { headers: getAuthHeaders() }
       );
