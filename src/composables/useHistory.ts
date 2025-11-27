@@ -38,7 +38,7 @@ export function useHistory() {
       }
 
       // Handle different possible field names for current page
-      const pageNumber = response.data.number ?? response.data.page ?? response.data.currentPage ?? page;
+      const pageNumber = response.data.number ?? page;
 
       currentPage.value = pageNumber;
       totalPages.value = response.data.totalPages;

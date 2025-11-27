@@ -128,12 +128,12 @@ const handleDownloadImage = async (event: Event, imageUrl: string, historyId: nu
 
 // Filter change handler
 const handleFilterChange = async (modelId: number | null) => {
-  await loadGenerationHistory(0, 20, false, modelId);
+  await loadGenerationHistory(0, 20, false, modelId ?? undefined);
 };
 
 // Load more handler with filter
 const handleLoadMore = async (modelId: number | null) => {
-  await loadMoreHistory(20, modelId);
+  await loadMoreHistory(20, modelId ?? undefined);
 };
 </script>
 

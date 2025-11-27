@@ -33,7 +33,7 @@ onMounted(() => {
   observer = new IntersectionObserver(
     (entries) => {
       const entry = entries[0];
-      if (entry.isIntersecting && props.hasMore && !props.loading) {
+      if (entry && entry.isIntersecting && props.hasMore && !props.loading) {
         console.log('🔄 Infinite scroll triggered - loading more');
         loadMore();
       }
