@@ -44,36 +44,25 @@ const updateRecommendedEpochs = (imageCount: number) => {
 const startTraining = async () => {
   try {
     errorMessage.value = '';
-    // TODO: Implement proper model creation and training job creation flow
-    // For now, using a placeholder jobId and casting config for type compatibility
-    if (trainingJobId.value === null) {
-      // This part needs to be properly implemented to create a model and then a training job
-      // For demonstration, let's assume a modelId of 1 and create a job
-      const modelCreationResponse = await api.training.createModel({
-        title: config.value.output_dir, // Using output_dir as title for now
-        description: 'Training job created from UI',
-        isPublic: false,
-      });
-      const modelId = modelCreationResponse.data.id;
-      const jobCreationResponse = await api.training.createTrainingJob(modelId);
-      trainingJobId.value = jobCreationResponse.data.id;
-    }
 
-    if (trainingJobId.value !== null) {
-      const response = await api.training.startTraining(trainingJobId.value, {
-        totalEpochs: config.value.epochs, // Use value from config
-        modelName: config.value.output_dir,
-        trainingImageUrls: [], // Empty for now, needs proper implementation
-        learningRate: config.value.learningRate, // Pass learning rate
-      });
-      statusMessage.value = response.message as string; // Assuming message is string
-      isTraining.value = true;
+    // The new `startTraining` API takes a single config object.
+    const response = await api.training.startTraining({
+      modelName: config.value.output_dir,
+      modelDescription: 'Training job created from UI',
+      trainingImageUrls: [], // TODO: This needs to be implemented properly
+      epochs: config.value.epochs,
+      learningRate: config.value.learningRate,
+      skipPreprocessing: config.value.skip_preprocessing,
+    });
 
-      // Connect to SSE stream for real-time progress
-      connectToStream();
-    } else {
-      errorMessage.value = 'Error: Could not obtain a training job ID.';
+    statusMessage.value = response.message as string;
+    if (response.data.job) {
+      trainingJobId.value = response.data.job.id;
     }
+    isTraining.value = true;
+
+    // Connect to SSE stream for real-time progress
+    connectToStream();
   } catch (error) {
     errorMessage.value = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
   }

@@ -680,6 +680,34 @@ export const api = {
 
   // ========== Training ==========
   training: {
+    /**
+     * 통합 학습 시작 엔드포인트
+     * - TrainingJob 생성 + 학습 시작을 동시에 수행
+     * - 학습 완료 후 LoraModel 자동 생성
+     */
+    async startTraining(config: {
+      modelName: string;
+      modelDescription?: string;
+      trainingImageUrls: string[];
+      triggerWord?: string;
+      epochs: number;
+      learningRate?: number;
+      loraRank?: number;
+      baseModel?: string;
+      skipPreprocessing?: boolean;
+      callbackBaseUrl?: string;
+    }): Promise<ApiResponse<{ job: TrainingJobResponse; message: string }>> {
+      const response = await authenticatedFetch(`${API_BASE_URL}/api/training/start`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(config),
+      });
+      return handleResponse(response);
+    },
+
+    /**
+     * @deprecated 더 이상 사용하지 않음 - startTraining 사용
+     */
     async createModel(data: {
       title: string;
       description?: string;
@@ -700,25 +728,13 @@ export const api = {
       return handleResponse(response);
     },
 
+    /**
+     * @deprecated 더 이상 사용하지 않음 - startTraining 사용
+     */
     async createTrainingJob(modelId: number): Promise<ApiResponse<TrainingJobResponse>> {
       const response = await authenticatedFetch(`${API_BASE_URL}/api/training/models/${modelId}`, {
         method: 'POST',
         headers: getAuthHeaders(),
-      });
-      return handleResponse(response);
-    },
-
-    async startTraining(jobId: number, config: {
-      totalEpochs: number;
-      modelName: string;
-      trainingImageUrls: string[];
-      learningRate?: number; // Added learningRate
-      callbackBaseUrl?: string;
-    }): Promise<ApiResponse<Record<string, unknown>>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/training/jobs/${jobId}/start`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(config),
       });
       return handleResponse(response);
     },

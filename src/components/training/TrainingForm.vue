@@ -19,7 +19,6 @@ const isPublic = ref(false);
 const skipPreprocessing = ref(false);
 
 const isTraining = ref(false);
-const modelId = ref<number | null>(null);
 const trainingJobId = ref<number | null>(null);
 const error = ref('');
 const currentEpoch = ref(0);
@@ -207,38 +206,19 @@ const startTraining = async () => {
     uploadError.value = '';
     currentEpoch.value = 0;
     totalEpochs.value = epochs.value;
-    statusMessage.value = 'Creating model...';
 
-    // 1. Create model to get a modelId
-    const modelResponse = await api.training.createModel({
-      title: title.value,
-      description: description.value,
-      trainingImagesCount: selectedImages.value.length,
-      epochs: epochs.value,
-      learningRate: learningRate.value,
-      loraRank: loraRank.value,
-      baseModel: baseModel.value,
-      isPublic: isPublic.value,
-    });
-    modelId.value = modelResponse.data.id;
-    statusMessage.value = 'Creating training job...';
-
-    // 2. Create a training job to get a jobId
-    const jobResponse = await api.training.createTrainingJob(modelId.value);
-    trainingJobId.value = jobResponse.data.id;
-
-    // 3. Get presigned URLs for image uploads
+    // 1. Get presigned URLs for image uploads
     statusMessage.value = 'Getting presigned URLs...';
     const fileNames = selectedImages.value.map(file => file.name);
     const urlResponse = await api.upload.getPresignedUrls(fileNames);
     const { uploadUrls, downloadUrls } = urlResponse.data;
 
-    // 4. Upload images to S3
+    // 2. Upload images to S3
     statusMessage.value = 'Uploading images to S3...';
     for (let i = 0; i < selectedImages.value.length; i++) {
       const file = selectedImages.value[i];
       const uploadUrl = uploadUrls[i];
-      if (uploadUrl && file) { // Ensure both uploadUrl and file are defined
+      if (uploadUrl && file) {
         statusMessage.value = `Uploading image ${i + 1}/${selectedImages.value.length}...`;
         await api.upload.uploadToS3(uploadUrl, file);
       } else {
@@ -246,16 +226,22 @@ const startTraining = async () => {
       }
     }
     statusMessage.value = 'All images uploaded successfully!';
-    
-    // 5. Start the actual training process
+
+    // 3. Start training (통합 엔드포인트 - TrainingJob 생성 + 학습 시작)
     statusMessage.value = 'Starting training...';
-    await api.training.startTraining(trainingJobId.value, {
-      totalEpochs: epochs.value,
+    const trainingResponse = await api.training.startTraining({
       modelName: title.value,
+      modelDescription: description.value,
       trainingImageUrls: downloadUrls,
+      triggerWord: triggerWord.value || undefined,
+      epochs: epochs.value,
       learningRate: learningRate.value,
+      loraRank: loraRank.value,
+      baseModel: baseModel.value,
+      skipPreprocessing: skipPreprocessing.value,
     });
 
+    trainingJobId.value = trainingResponse.data.job.id;
     statusMessage.value = 'Training started...';
     emit('training-status-change', {
       isTraining: true,
