@@ -115,4 +115,44 @@ const downloadImage = (event: Event, imageUrl: string, historyId: number) => {
 .prompt-text {
   color: #e0e0e0; /* A whitish-gray, matching ModelCard */
 }
+
+/* Prevent long-press context menu on mobile */
+.history-thumbnail img {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 1024px) {
+  .grid-cols-4 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .grid-cols-4 {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-md);
+  }
+}
+
+@media (max-width: 480px) {
+  .grid-cols-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Mobile: Always show overlay on touch devices */
+@media (hover: none) and (pointer: coarse) {
+  .history-thumbnail > div.absolute {
+    opacity: 0.9;
+  }
+
+  /* Make buttons more touch-friendly */
+  .btn-sm {
+    min-height: 44px;
+    padding: var(--space-sm) var(--space-md);
+  }
+}
 </style>
