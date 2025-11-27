@@ -2,23 +2,28 @@
 import { ref } from 'vue';
 import GenerationHistoryList from './GenerationHistoryList.vue';
 import TrainingHistoryList from './TrainingHistoryList.vue';
-import type { GenerationHistoryResponse, TrainingJobResponse } from '../../services/api';
+import type { GenerationHistoryResponse, TrainingJobResponse, AvailableModelResponse } from '../../services/api';
 
 interface Props {
   generationHistory: GenerationHistoryResponse[];
   trainingHistory: TrainingJobResponse[];
+  availableModels: AvailableModelResponse[];
   loading?: boolean;
+  hasMore?: boolean;
 }
 
 interface Emits {
   (e: 'openGenerationDetail', historyId: number): void;
   (e: 'downloadImage', event: Event, imageUrl: string, historyId: number): void;
+  (e: 'loadMore', modelId: number | null): void;
+  (e: 'filterChange', modelId: number | null): void;
 }
 
 defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const historySubTab = ref<'generate' | 'training'>('generate');
+const currentFilterModelId = ref<number | null>(null);
 
 const openHistoryDetailModal = (historyId: number) => {
   emit('openGenerationDetail', historyId);
@@ -26,6 +31,15 @@ const openHistoryDetailModal = (historyId: number) => {
 
 const downloadImage = (event: Event, imageUrl: string, historyId: number) => {
   emit('downloadImage', event, imageUrl, historyId);
+};
+
+const loadMore = () => {
+  emit('loadMore', currentFilterModelId.value);
+};
+
+const handleFilterChange = (modelId: number | null) => {
+  currentFilterModelId.value = modelId;
+  emit('filterChange', modelId);
 };
 </script>
 
@@ -53,9 +67,13 @@ const downloadImage = (event: Event, imageUrl: string, historyId: number) => {
     <GenerationHistoryList
       v-if="historySubTab === 'generate'"
       :history="generationHistory"
+      :available-models="availableModels"
       :loading="loading"
+      :has-more="hasMore"
       @open-detail="openHistoryDetailModal"
       @download="downloadImage"
+      @load-more="loadMore"
+      @filter-change="handleFilterChange"
     />
 
     <!-- Training History -->

@@ -303,49 +303,70 @@ const isSampleSelected = (imageId: number) => {
   return currentSamples.value.some(s => s.generatedImageId === imageId);
 };
 
-const toggleImageSelection = async (image: any) => {
+const toggleImageSelection = (image: any) => {
   if (!props.modelId) return;
 
   const existingSampleIndex = currentSamples.value.findIndex(s => s.generatedImageId === image.id);
 
   if (existingSampleIndex >= 0) {
-    // Remove from samples
-    const sample = currentSamples.value[existingSampleIndex];
-    try {
-      await api.models.deleteSample(props.modelId, sample.id);
-      currentSamples.value.splice(existingSampleIndex, 1);
-    } catch (err) {
-      console.error('Failed to remove sample:', err);
-      alert('Failed to remove sample');
-    }
+    // Remove from local state only
+    currentSamples.value.splice(existingSampleIndex, 1);
   } else {
-    // Add to samples
-    try {
-      const response = await api.models.addSample(props.modelId, image.id);
-      currentSamples.value.push({
-        id: response.data.id,
-        generatedImageId: image.id,
-        imageUrl: image.s3Url,
-        isPrimary: false
-      });
-    } catch (err) {
-      console.error('Failed to add sample:', err);
-      alert('Failed to add sample');
-    }
+    // Add to local state only (with temporary id)
+    currentSamples.value.push({
+      id: null, // Temporary - will be created on save
+      generatedImageId: image.id,
+      imageUrl: image.s3Url,
+      isPrimary: false
+    });
   }
 };
 
 const saveSamples = async () => {
-  if (!props.modelId || currentSamples.value.length === 0) return;
+  if (!props.modelId) return;
+
+  // Validate: Public models must have at least 1 sample
+  if (model.value?.isPublic && currentSamples.value.length === 0) {
+    alert('공개 모델은 최소 1개 이상의 샘플 이미지가 필요합니다. 샘플을 추가하거나 모델을 비공개로 전환해주세요.');
+    return;
+  }
 
   try {
-    // Update order
-    const sampleIds = currentSamples.value.map(s => s.id);
-    await api.models.updateSampleOrder(props.modelId, sampleIds);
+    const originalSamples = model.value?.samples || [];
 
-    // Set first sample as primary (thumbnail)
-    if (sampleIds.length > 0) {
-      await api.models.setPrimarySample(props.modelId, sampleIds[0]);
+    // Find samples to remove (in original but not in current)
+    const samplesToRemove = originalSamples.filter(
+      (original: any) => !currentSamples.value.some(current => current.generatedImageId === original.generatedImageId)
+    );
+
+    // Find samples to add (in current but not in original, or has null id)
+    const samplesToAdd = currentSamples.value.filter(
+      current => current.id === null || !originalSamples.some((original: any) => original.generatedImageId === current.generatedImageId)
+    );
+
+    // Remove samples
+    for (const sample of samplesToRemove) {
+      await api.models.deleteSample(props.modelId, sample.id);
+    }
+
+    // Add samples and get their IDs
+    const addedSampleIds: number[] = [];
+    for (const sample of samplesToAdd) {
+      const response = await api.models.addSample(props.modelId, sample.generatedImageId);
+      addedSampleIds.push(response.data.id);
+      // Update local sample with real ID
+      sample.id = response.data.id;
+    }
+
+    // Update order only if there are samples
+    if (currentSamples.value.length > 0) {
+      const sampleIds = currentSamples.value.map(s => s.id).filter(id => id !== null);
+      await api.models.updateSampleOrder(props.modelId, sampleIds);
+
+      // Set first sample as primary (thumbnail)
+      if (sampleIds.length > 0) {
+        await api.models.setPrimarySample(props.modelId, sampleIds[0]);
+      }
     }
 
     // Reload model details
@@ -357,7 +378,7 @@ const saveSamples = async () => {
     emit('model-update');
   } catch (err) {
     console.error('Failed to save samples:', err);
-    alert('Failed to save sample order');
+    alert('Failed to save samples');
   }
 };
 
@@ -378,6 +399,54 @@ const handleDrop = (targetIndex: number) => {
   currentSamples.value.splice(targetIndex, 0, draggedItem);
 
   draggedSampleIndex.value = null;
+};
+
+// Move sample up or down
+const moveSampleUp = (index: number) => {
+  if (index === 0) return;
+
+  // Swap with previous item
+  const temp = currentSamples.value[index];
+  currentSamples.value[index] = currentSamples.value[index - 1];
+  currentSamples.value[index - 1] = temp;
+};
+
+const moveSampleDown = (index: number) => {
+  if (index === currentSamples.value.length - 1) return;
+
+  // Swap with next item
+  const temp = currentSamples.value[index];
+  currentSamples.value[index] = currentSamples.value[index + 1];
+  currentSamples.value[index + 1] = temp;
+};
+
+// Visibility toggle
+const toggleVisibility = async () => {
+  if (!props.modelId || !model.value) return;
+
+  const newVisibility = !model.value.isPublic;
+
+  // If trying to make public, check if there are samples
+  if (newVisibility && (!model.value.samples || model.value.samples.length === 0)) {
+    alert('샘플 이미지를 먼저 선택해주세요. 샘플 이미지가 있어야 모델을 공개할 수 있습니다.');
+    return;
+  }
+
+  try {
+    await api.models.updateModel(props.modelId, {
+      isPublic: newVisibility
+    });
+
+    // Update local state
+    model.value.isPublic = newVisibility;
+
+    emit('model-update');
+
+    alert(newVisibility ? '모델이 공개되었습니다!' : '모델이 비공개로 변경되었습니다.');
+  } catch (err) {
+    console.error('Failed to update visibility:', err);
+    alert('공개 상태 변경에 실패했습니다.');
+  }
 };
 </script>
 
@@ -422,7 +491,7 @@ const handleDrop = (targetIndex: number) => {
                     <div v-if="currentSamples.length === 0" class="text-center p-lg text-muted">
                       No samples selected. Select images from below.
                     </div>
-                    <div v-else class="grid grid-cols-3 gap-md">
+                    <div v-else class="current-samples-grid">
                       <div
                         v-for="(sample, index) in currentSamples"
                         :key="sample.id"
@@ -433,9 +502,32 @@ const handleDrop = (targetIndex: number) => {
                         @dragover="handleDragOver"
                         @drop="handleDrop(index)"
                       >
-                        <img :src="sample.imageUrl" alt="Sample" class="img-cover rounded-lg cursor-move" />
+                        <img :src="sample.imageUrl" alt="Sample" class="img-cover rounded-lg" />
                         <div v-if="index === 0" class="badge badge-primary primary-badge">Thumbnail</div>
                         <div class="sample-order-badge">{{ index + 1 }}</div>
+                        <!-- Move buttons for mobile -->
+                        <div class="sample-move-buttons">
+                          <button
+                            v-if="index > 0"
+                            @click="moveSampleUp(index)"
+                            class="btn-move btn-move-up"
+                            title="Move up"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <polyline points="18 15 12 9 6 15"></polyline>
+                            </svg>
+                          </button>
+                          <button
+                            v-if="index < currentSamples.length - 1"
+                            @click="moveSampleDown(index)"
+                            class="btn-move btn-move-down"
+                            title="Move down"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -446,7 +538,7 @@ const handleDrop = (targetIndex: number) => {
                     <div v-if="availableImages.length === 0" class="text-center p-lg text-muted">
                       No generated images found. Generate images with this model first.
                     </div>
-                    <div v-else class="grid grid-cols-4 gap-sm available-images-grid hide-scrollbar">
+                    <div v-else class="available-images-grid hide-scrollbar">
                       <div
                         v-for="image in availableImages"
                         :key="image.id"
@@ -478,6 +570,40 @@ const handleDrop = (targetIndex: number) => {
                 <div class="flex items-center gap-md mb-lg">
                   <p class="font-semibold">{{ model.userNickname }}</p>
                 </div>
+
+                <!-- Visibility Status and Toggle -->
+                <div v-if="isOwner" class="visibility-section mb-lg">
+                  <div class="flex items-center justify-between p-md rounded-lg" style="background: var(--bg-hover); border: 1px solid var(--border);">
+                    <div class="flex items-center gap-md">
+                      <div class="visibility-icon">
+                        <svg v-if="model.isPublic" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-success">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                          <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                        <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted">
+                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                          <line x1="1" y1="1" x2="23" y2="23"></line>
+                        </svg>
+                      </div>
+                      <div>
+                        <p class="font-semibold">{{ model.isPublic ? '공개' : '비공개' }}</p>
+                        <p class="text-sm text-muted">
+                          {{ model.isPublic ? '모든 사용자가 볼 수 있습니다' : '나만 볼 수 있습니다' }}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      @click="toggleVisibility"
+                      class="btn btn-sm"
+                      :class="model.isPublic ? 'btn-secondary' : 'btn-primary'"
+                    >
+                      {{ model.isPublic ? '비공개로 전환' : '공개하기' }}
+                    </button>
+                  </div>
+                  <p v-if="!model.isPublic && (!model.samples || model.samples.length === 0)" class="text-sm text-warning mt-sm">
+                    ⚠️ 샘플 이미지를 추가해야 모델을 공개할 수 있습니다
+                  </p>
+                </div>
                 <div class="flex flex-wrap gap-sm items-center mb-lg">
                   <template v-if="isEditingTags">
                     <div class="w-full">
@@ -492,12 +618,12 @@ const handleDrop = (targetIndex: number) => {
                   </template>
                   <template v-else>
                     <span v-for="tag in model.tags" :key="tag.id" class="tag">{{ tag.name }}</span>
-                    <button v-if="isOwner" @click="startEditTags" class="btn btn-ghost btn-icon btn-sm ml-sm">
+                    <button v-if="isOwner" @click="startEditTags" class="btn btn-ghost btn-icon btn-sm">
                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
                     </button>
                   </template>
                 </div>
-                <div class="flex gap-sm">
+                <div class="flex gap-sm action-buttons">
                   <button class="btn btn-icon" @click="toggleLike" :class="model.isLiked ? 'btn-primary' : 'btn-secondary'">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" :fill="model.isLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
                       <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
@@ -672,17 +798,20 @@ const handleDrop = (targetIndex: number) => {
 
 .sample-item {
   aspect-ratio: 1;
-  overflow: hidden; /* Ensure content doesn't overflow during scale */
-  border-radius: var(--radius-lg); /* Apply border-radius to the parent container */
+  overflow: hidden;
+  border-radius: var(--radius-lg);
 }
 
 .sample-item img {
-  transition: transform 0.3s ease, filter 0.3s ease; /* Add transition for smooth effect */
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: filter 0.3s ease, opacity 0.3s ease;
 }
 
 .sample-item img:hover {
-  transform: scale(1.05); /* Slightly scale up */
-  filter: brightness(1.1); /* Slightly brighten */
+  filter: brightness(1.15);
+  opacity: 0.9;
 }
 
 @media (max-width: 768px) {
@@ -709,15 +838,28 @@ const handleDrop = (targetIndex: number) => {
     scroll-snap-align: start;
   }
 
-  .btn-icon {
-    padding: 8px; /* Smaller padding for icon buttons on mobile */
+  /* Make action buttons fill width on mobile */
+  .action-buttons {
+    width: 100%;
   }
 
-  /* Fix available images grid to show 2 columns on mobile */
+  .action-buttons .btn {
+    flex: 1;
+    padding: var(--space-md) var(--space-lg);
+    font-size: 16px;
+  }
+
+  .action-buttons .btn-icon {
+    min-width: 80px;
+  }
+
+  /* Adjust available images grid on mobile */
   .available-images-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: var(--space-sm) !important;
-    max-height: 400px;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)) !important;
+  }
+
+  .current-samples-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)) !important;
   }
 }
 
@@ -745,6 +887,21 @@ const handleDrop = (targetIndex: number) => {
   padding: var(--space-lg);
 }
 
+.current-samples-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-md);
+  max-height: 500px;
+  overflow-y: auto;
+  padding: var(--space-xs);
+}
+
+@media (min-width: 768px) {
+  .current-samples-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
+}
+
 .sample-item-draggable {
   position: relative;
   aspect-ratio: 1;
@@ -757,7 +914,7 @@ const handleDrop = (targetIndex: number) => {
 
 .sample-item-draggable:hover {
   border-color: var(--primary);
-  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
 .sample-item-draggable.sample-primary {
@@ -788,8 +945,18 @@ const handleDrop = (targetIndex: number) => {
 }
 
 .available-images-grid {
-  max-height: 300px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--space-sm);
+  max-height: 400px;
   overflow-y: auto;
+  padding: var(--space-xs);
+}
+
+@media (min-width: 768px) {
+  .available-images-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
 }
 
 .available-image-item {
@@ -804,7 +971,7 @@ const handleDrop = (targetIndex: number) => {
 
 .available-image-item:hover {
   border-color: var(--primary);
-  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
 }
 
 .available-image-item.selected {
@@ -829,5 +996,97 @@ const handleDrop = (targetIndex: number) => {
 
 .cursor-move {
   cursor: move;
+}
+
+/* Sample move buttons */
+.sample-move-buttons {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  gap: 4px;
+  z-index: 10;
+}
+
+.btn-move {
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px;
+  cursor: pointer;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.btn-move:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.btn-move:active {
+  transform: scale(0.95);
+}
+
+/* Desktop: show buttons on hover */
+.sample-item-draggable:hover .sample-move-buttons {
+  display: flex;
+}
+
+/* Mobile: always show buttons */
+@media (max-width: 768px) {
+  .sample-move-buttons {
+    display: flex !important;
+  }
+
+  .sample-item-draggable {
+    cursor: default;
+  }
+}
+
+/* ========== Visibility Section Styles ========== */
+.visibility-section {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.visibility-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.text-success {
+  color: var(--success, #10b981);
+}
+
+.text-warning {
+  color: var(--warning, #f59e0b);
+}
+
+/* Mobile responsive for visibility section */
+@media (max-width: 768px) {
+  .visibility-section .flex {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-md);
+  }
+
+  .visibility-section .btn {
+    width: 100%;
+  }
 }
 </style>

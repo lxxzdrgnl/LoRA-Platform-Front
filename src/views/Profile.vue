@@ -21,7 +21,7 @@ const authStore = useAuthStore();
 // Composables
 const { user, loading: profileLoading, loadUserProfile, updateProfile } = useProfile();
 const { myModels, likedModels, loading: modelsLoading, loadMyModels, loadLikedModels, refreshAllModels } = useModels();
-const { generationHistory, trainingHistory, loading: historyLoading, loadGenerationHistory, loadTrainingHistory, deleteGenerationHistory, downloadImage } = useHistory();
+const { generationHistory, trainingHistory, availableModels, loading: historyLoading, hasMore, loadGenerationHistory, loadMoreHistory, loadAvailableModels, loadTrainingHistory, deleteGenerationHistory, downloadImage } = useHistory();
 
 // Modal state
 const showDetailModal = ref(false);
@@ -61,7 +61,8 @@ onMounted(async () => {
       loadUserProfile(),
       loadMyModels(),
       loadLikedModels(),
-      loadGenerationHistory(),
+      loadGenerationHistory(0, 20),
+      loadAvailableModels(),
       loadTrainingHistory(),
     ]);
   } catch (error) {
@@ -123,6 +124,16 @@ const handleProfileUpdate = async (data: { nickname: string; profileImageUrl?: s
 const handleDownloadImage = async (event: Event, imageUrl: string, historyId: number) => {
   event.stopPropagation();
   await downloadImage(imageUrl, historyId);
+};
+
+// Filter change handler
+const handleFilterChange = async (modelId: number | null) => {
+  await loadGenerationHistory(0, 20, false, modelId);
+};
+
+// Load more handler with filter
+const handleLoadMore = async (modelId: number | null) => {
+  await loadMoreHistory(20, modelId);
 };
 </script>
 
@@ -192,9 +203,13 @@ const handleDownloadImage = async (event: Event, imageUrl: string, historyId: nu
           v-if="activeTab === 'history'"
           :generation-history="generationHistory"
           :training-history="trainingHistory"
+          :available-models="availableModels"
           :loading="historyLoading"
+          :has-more="hasMore"
           @open-generation-detail="openHistoryDetailModal"
           @download-image="handleDownloadImage"
+          @load-more="handleLoadMore"
+          @filter-change="handleFilterChange"
         />
       </div>
     </div>
