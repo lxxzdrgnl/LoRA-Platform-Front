@@ -14,7 +14,7 @@ const trainingImagesCount = ref(0);
 const learningRate = ref(0.0001);
 const epochs = ref(10);
 const loraRank = ref(32);
-const baseModel = ref('stablediffusionapi/anything-v5');
+const baseModel = ref('Lykon/AnyLoRA');
 const isPublic = ref(false);
 const skipPreprocessing = ref(false);
 
@@ -554,6 +554,7 @@ onUnmounted(() => {
                     </div>
                     <select v-model="baseModel" class="input" :disabled="isTraining">
                         <option value="stablediffusionapi/anything-v5">Anything V5</option>
+                        <option value="Lykon/AnyLoRA">AnyLoRA</option>
                     </select>
                   </div>
               </div>
@@ -814,6 +815,18 @@ input:checked + .switch-slider:before {
 @media (max-width: 1024px) {
   .image-preview-grid {
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+
+  .card {
+    padding: var(--space-md);
+  }
+
+  .accordion-header {
+    padding: var(--space-md);
+  }
+
+  .accordion-content {
+    padding: var(--space-md);
   }
 }
 
