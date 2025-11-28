@@ -90,7 +90,7 @@ const loadMore = () => {
     <div v-else-if="history.length" class="grid grid-cols-4 gap-lg">
       <div v-for="item in history" :key="item.id" class="history-card card card-clickable">
         <div
-          class="history-thumbnail relative aspect-square w-full group rounded-lg"
+          class="history-thumbnail relative w-full group rounded-lg"
           @click="openHistoryDetailModal(item.id)"
         >
           <!-- Image -->
@@ -98,14 +98,13 @@ const loadMore = () => {
             v-if="item.generatedImages?.[0]?.s3Url"
             :src="item.generatedImages[0].s3Url"
             alt="Generated"
-            class="w-full h-full object-cover transition-transform duration-300"
           />
           <div v-else class="w-full h-full flex items-center justify-center text-muted">
             <span>No Image</span>
           </div>
 
           <!-- Hover Overlay -->
-          <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-between p-md text-white">
+          <div class="history-overlay">
             <!-- Top Actions -->
             <div class="flex justify-end gap-sm">
               <button
@@ -219,33 +218,54 @@ const loadMore = () => {
 }
 
 .history-thumbnail {
-  /* This div already has relative, aspect-square, w-full, group, rounded-lg from template */
+  /* This div already has relative, w-full, group, rounded-lg from template */
   /* Ensure overflow hidden for image corners */
   overflow: hidden;
-  aspect-ratio: 1;
   width: 100%;
+  background: transparent;
+  aspect-ratio: 1; /* Default to square, like ModelCard */
+  height: auto;
 }
 
-.history-thumbnail > div {
+.history-thumbnail > div:not(.history-overlay) {
   width: 100%;
   height: 100%;
   background: var(--bg-hover);
 }
 
-/* Add an explicit hover effect for the image to scale, similar to ModelCard */
+/* Image transitions */
+.history-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center !important;
+  transition: transform 0.3s ease;
+}
+
 .history-card:hover .history-thumbnail img {
   transform: scale(1.05);
-  filter: brightness(0.75); /* Re-adding the brightness filter */
 }
 
-/* Explicitly ensure the overlay appears on hover */
-.history-card:hover .history-thumbnail > div.absolute {
+/* Overlay styling */
+.history-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--space-sm);
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.2) 40%, rgba(0, 0, 0, 0.8) 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  color: white;
+  z-index: 2;
+}
+
+.history-card:hover .history-overlay {
   opacity: 1;
-}
-
-/* This is to counteract the group-hover utility that we replaced with explicit CSS */
-.history-thumbnail img {
-  transition: transform 0.3s ease, filter 0.3s ease; /* Keep transition for scale and add for filter */
 }
 
 .prompt-text {
@@ -266,7 +286,10 @@ const loadMore = () => {
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
+  .history-thumbnail {
+    aspect-ratio: 419 / 330;
+  }
   .grid-cols-4 {
     grid-template-columns: repeat(2, 1fr);
     gap: var(--space-md);
@@ -279,9 +302,10 @@ const loadMore = () => {
   }
 }
 
-/* Mobile: Always show overlay on touch devices */
+/* Mobile: Make overlay appear on tap and make buttons touch-friendly */
 @media (hover: none) and (pointer: coarse) {
-  .history-thumbnail > div.absolute {
+  /* Show overlay when card is tapped */
+  .history-card:active .history-overlay {
     opacity: 0.9;
   }
 

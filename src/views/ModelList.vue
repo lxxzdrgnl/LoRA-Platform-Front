@@ -508,7 +508,7 @@ const handleOpenGenerate = (modelId: number) => {
 .models-grid-container {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  grid-auto-rows: 250px;
+  grid-auto-rows: auto;
   grid-auto-flow: dense;
   gap: var(--space-lg);
 }
@@ -518,9 +518,10 @@ const handleOpenGenerate = (modelId: number) => {
   grid-row: span 2;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .models-grid-container {
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-auto-rows: auto;
   }
   .model-card-large {
     grid-column: span 1;

@@ -109,6 +109,7 @@ defineEmits(['click']);
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center center !important;
   transition: transform 0.3s ease;
 }
 
@@ -197,5 +198,16 @@ defineEmits(['click']);
 
 .model-footer {
   color: #e0e0e0;
+}
+
+@media (max-width: 767px) {
+  .model-thumbnail {
+    aspect-ratio: 419 / 330; /* Maintain 419:330 aspect ratio on mobile */
+    height: auto; /* Height will be determined by aspect-ratio and width: 100% */
+  }
+
+  .model-thumbnail img {
+    object-position: center center !important;
+  }
 }
 </style>

@@ -470,6 +470,15 @@ const deleteModel = async () => {
     alert('모델 삭제에 실패했습니다.');
   }
 };
+
+const handleCompleteEdit = async () => {
+  // If in sample editing mode, save samples first
+  if (isEditingSamples.value) {
+    await saveSamples();
+  }
+  // Exit edit mode
+  isEditingModel.value = false;
+};
 </script>
 
 <template>
@@ -493,16 +502,27 @@ const deleteModel = async () => {
               <section class="samples-section mb-lg">
                 <div class="flex items-center justify-between mb-md">
                   <h2 class="text-2xl font-bold">Sample Images</h2>
-                  <button v-if="isOwner && !isEditingSamples" @click="startEditSamples" class="btn btn-sm btn-primary">
-                    Edit Samples
+                  <button v-if="isOwner && !isEditingModel" @click="isEditingModel = true" class="btn btn-sm btn-primary">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                    </svg>
+                    Edit Mode
+                  </button>
+                  <button v-if="isOwner && isEditingModel" @click="handleCompleteEdit" class="btn btn-sm btn-secondary">
+                    완료
                   </button>
                 </div>
 
                 <!-- Normal Mode -->
-                <div v-if="!isEditingSamples" class="grid grid-cols-3 gap-lg hide-scrollbar">
-                  <div v-for="sample in model.samples" :key="sample.id" class="sample-item">
-                    <img :src="sample.imageUrl" alt="Sample" class="img-cover rounded-lg" />
+                <div v-if="!isEditingSamples">
+                  <div class="grid grid-cols-3 gap-lg hide-scrollbar">
+                    <div v-for="sample in model.samples" :key="sample.id" class="sample-item">
+                      <img :src="sample.imageUrl" alt="Sample" class="img-cover rounded-lg" />
+                    </div>
                   </div>
+                  <button v-if="isOwner && isEditingModel" @click="startEditSamples" class="btn btn-sm btn-primary mt-md w-full">
+                    Edit Samples
+                  </button>
                 </div>
 
                 <!-- Edit Mode -->
@@ -591,25 +611,18 @@ const deleteModel = async () => {
                 <p class="text-lg text-secondary mb-md">{{ model.description }}</p>
                 <div class="flex items-center justify-between mb-lg">
                   <p class="font-semibold">{{ model.userNickname }}</p>
-                  <div v-if="isOwner && !isEditingModel" class="flex items-center gap-sm">
-                    <div class="flex items-center gap-xs">
-                      <svg v-if="model.isPublic" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-success">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                        <circle cx="12" cy="12" r="3"></circle>
-                      </svg>
-                      <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted">
-                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                        <line x1="1" y1="1" x2="23" y2="23"></line>
-                      </svg>
-                      <span class="text-sm font-semibold" :class="model.isPublic ? 'text-success' : 'text-muted'">
-                        {{ model.isPublic ? '공개' : '비공개' }}
-                      </span>
-                    </div>
-                    <button @click="isEditingModel = true" class="btn btn-ghost btn-icon btn-sm">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
-                      </svg>
-                    </button>
+                  <div v-if="isOwner && !isEditingModel" class="flex items-center gap-xs">
+                    <svg v-if="model.isPublic" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-success">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                    <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                      <line x1="1" y1="1" x2="23" y2="23"></line>
+                    </svg>
+                    <span class="text-sm font-semibold" :class="model.isPublic ? 'text-success' : 'text-muted'">
+                      {{ model.isPublic ? '공개' : '비공개' }}
+                    </span>
                   </div>
                 </div>
 
@@ -661,13 +674,6 @@ const deleteModel = async () => {
                     ⚠️ 샘플 이미지를 추가해야 모델을 공개할 수 있습니다
                   </p>
                 </div>
-
-                <!-- Edit Mode Cancel Button -->
-                <div v-if="isOwner && isEditingModel" class="mb-lg">
-                  <button @click="isEditingModel = false" class="btn btn-secondary btn-sm">
-                    완료
-                  </button>
-                </div>
                 <div class="flex flex-wrap gap-sm items-center mb-lg">
                   <template v-if="isEditingTags">
                     <div class="w-full">
@@ -682,7 +688,7 @@ const deleteModel = async () => {
                   </template>
                   <template v-else>
                     <span v-for="tag in model.tags" :key="tag.id" class="tag">{{ tag.name }}</span>
-                    <button v-if="isOwner" @click="startEditTags" class="btn btn-ghost btn-icon btn-sm">
+                    <button v-if="isOwner && isEditingModel" @click="startEditTags" class="btn btn-ghost btn-icon btn-sm">
                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
                     </button>
                   </template>
@@ -709,7 +715,7 @@ const deleteModel = async () => {
               <section class="prompts-section mb-lg">
                 <div class="flex items-center justify-between mb-lg">
                   <h2 class="text-2xl font-bold gradient-text">Prompt Examples</h2>
-                  <button v-if="isOwner && editingPromptId === null" @click="editingPromptId = -1" class="btn btn-sm btn-primary">
+                  <button v-if="isOwner && isEditingModel && editingPromptId === null" @click="editingPromptId = -1" class="btn btn-sm btn-primary">
                     Add New Prompt
                   </button>
                 </div>
@@ -746,7 +752,7 @@ const deleteModel = async () => {
                   <div v-for="prompt in model.prompts" :key="prompt.id" class="card">
                     <div class="flex items-center justify-between mb-md">
                       <h3 class="font-semibold">{{ prompt.title }}</h3>
-                      <div v-if="isOwner" class="flex gap-sm">
+                      <div v-if="isOwner && isEditingModel" class="flex gap-sm">
                         <button @click="startEditPrompt(prompt)" class="btn btn-ghost btn-sm">Edit</button>
                         <button @click="deletePrompt(prompt.id)" class="btn btn-ghost btn-sm text-error">Delete</button>
                       </div>
@@ -840,24 +846,29 @@ const deleteModel = async () => {
   flex-direction: column;
   box-shadow: var(--shadow-lg);
   overflow: hidden;
-   
-  
   position: relative;
 }
 
 .modal-body-content {
   padding: var(--space-lg);
   overflow-y: auto;
+  overflow-x: hidden;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .independent-scroll-container {
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: var(--space-lg);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .scrollable-column {
   padding-right: var(--space-md);
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .sample-item {
@@ -880,13 +891,30 @@ const deleteModel = async () => {
 
 @media (max-width: 768px) {
   .modal-overlay {
-    padding: var(--space-xs); /* Reduce outer padding on mobile */
+    padding: var(--space-xs);
+  }
+  .modal-content {
+    border-radius: var(--radius-md);
+    max-height: 95vh;
   }
   .modal-body-content {
-    padding: var(--space-md);
+    padding: var(--space-lg);
   }
   .independent-scroll-container {
     grid-template-columns: 1fr;
+    gap: var(--space-md);
+  }
+  .scrollable-column {
+    padding-right: 0;
+  }
+  /* Prevent text overflow */
+  .model-detail-page {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  .model-detail-page * {
+    max-width: 100%;
+    box-sizing: border-box;
   }
   /* Change image grid to a horizontal scroll container on mobile */
   .samples-section .grid-cols-3 {
