@@ -62,6 +62,8 @@ watch([trainingImagesCount, learningRate], () => {
 let websocket: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 20; // 최대 20번 재연결 시도 (100초) - 장시간 학습 대응
 
 const formatLearningRate = (value: number): string => {
   return value.toExponential(0);
@@ -207,6 +209,7 @@ const startTraining = async () => {
     statusMessage.value = 'All images uploaded successfully!';
 
     // 3. Start training (통합 엔드포인트 - TrainingJob 생성 + 학습 시작)
+    reconnectAttempts = 0; // 학습 시작 시 재연결 카운터 리셋
     statusMessage.value = 'Starting training...';
     const trainingResponse = await api.training.startTraining({
       modelName: title.value,
@@ -250,7 +253,7 @@ const connectWebSocket = () => {
   const userId = currentUserId.value || 0;
   const wsUrl = getWebSocketUrl(`/ws/training?userId=${userId}`);
 
-  console.log('Attempting WebSocket connection to:', wsUrl, 'with userId:', userId);
+  console.log(`Attempting WebSocket connection to: ${wsUrl}, with userId: ${userId}, attempt: ${reconnectAttempts + 1}`);
   statusMessage.value = 'Connecting to training server...';
 
   try {
@@ -260,6 +263,7 @@ const connectWebSocket = () => {
       console.log('WebSocket connected successfully');
       statusMessage.value = 'Connected to training server';
       error.value = ''; // Clear any previous errors
+      reconnectAttempts = 0; // 연결 성공 시 재연결 카운터 리셋
 
       heartbeatTimer = setInterval(() => {
         if (websocket && websocket.readyState === WebSocket.OPEN) {
@@ -351,10 +355,15 @@ const connectWebSocket = () => {
       console.log('WebSocket closed:', event.code, event.reason);
       if (heartbeatTimer) clearInterval(heartbeatTimer);
 
-      if (isTraining.value) {
-        console.log('Training in progress, will reconnect in 5 seconds...');
-        statusMessage.value = 'Reconnecting to training server...';
+      if (isTraining.value && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        reconnectAttempts++;
+        console.log(`Training in progress, will reconnect in 5 seconds... (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+        statusMessage.value = `Reconnecting to training server... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`;
         reconnectTimer = setTimeout(connectWebSocket, 5000);
+      } else if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        console.error('최대 재연결 시도 횟수 초과. 연결을 중단합니다.');
+        error.value = '서버 연결이 불안정합니다. 학습 상태를 확인해주세요.';
+        isTraining.value = false;
       }
     };
   } catch (err) {
@@ -375,6 +384,7 @@ const disconnectWebSocket = () => {
     websocket.close();
     websocket = null;
   }
+  reconnectAttempts = 0; // 재연결 카운터 리셋
 };
 
 const cancelTraining = async () => {

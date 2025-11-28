@@ -46,11 +46,14 @@ const error = ref('');
 const currentStep = ref(0);
 const totalSteps = ref(0);
 const statusMessage = ref('');
+const currentUserId = ref<number | null>(null);
 
 let currentHistoryId: number | null = null;
 let websocket: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 20; // 최대 20번 재연결 시도 (100초) - 첫 신호가 늦을 수 있음
 
 // Watch for the modal to open
 watch(() => props.show, async (newVal) => {
@@ -105,6 +108,13 @@ const filteredCommunityModels = computed(() => {
 
 const checkOngoingGeneration = async () => {
   try {
+    // Get current user ID if not already set
+    if (!currentUserId.value) {
+      const userResponse = await api.user.getMyProfile();
+      currentUserId.value = userResponse.data.id;
+      console.log('Current user ID:', currentUserId.value);
+    }
+
     const response = await api.generate.getOngoingGeneration();
 
     if (response.data && response.data.id) {
@@ -250,9 +260,17 @@ const startGeneration = async () => {
   }
 
   try {
+    // Get current user ID if not already set
+    if (!currentUserId.value) {
+      const userResponse = await api.user.getMyProfile();
+      currentUserId.value = userResponse.data.id;
+      console.log('Current user ID:', currentUserId.value);
+    }
+
     isGenerating.value = true;
     error.value = '';
     generatedImages.value = [];
+    reconnectAttempts = 0; // 생성 시작 시 재연결 카운터 리셋
 
     // 초기 상태: 모델 불러오는 중 (SSE에서 진행률 오기 전)
     currentStep.value = 0;
@@ -326,16 +344,17 @@ const connectWebSocket = () => {
     heartbeatTimer = null;
   }
 
-  const userId = localStorage.getItem('userId') || '0';
+  const userId = currentUserId.value || 0;
   const wsUrl = getWebSocketUrl(`/ws/generation?userId=${userId}`);
 
-  console.log('🔌 WebSocket 연결 시도:', wsUrl);
+  console.log(`🔌 WebSocket 연결 시도: ${wsUrl}, with userId: ${userId}, attempt: ${reconnectAttempts + 1}`);
   statusMessage.value = '모델 불러오는 중...';
 
   websocket = new WebSocket(wsUrl);
 
   websocket.onopen = () => {
     console.log('✅ WebSocket 연결 성공');
+    reconnectAttempts = 0; // 연결 성공 시 재연결 카운터 리셋
 
     // Heartbeat 시작 (30초마다 ping 전송)
     heartbeatTimer = setInterval(() => {
@@ -422,13 +441,19 @@ const connectWebSocket = () => {
       heartbeatTimer = null;
     }
 
-    // 진행 중인 작업이 있으면 5초 후 재연결
-    if (isGenerating.value && currentHistoryId !== null) {
-      console.log('🔄 5초 후 재연결 시도...');
+    // 진행 중인 작업이 있으면 5초 후 재연결 (최대 10번까지)
+    if (isGenerating.value && currentHistoryId !== null && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+      reconnectAttempts++;
+      console.log(`🔄 5초 후 재연결 시도... (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+      statusMessage.value = `Reconnecting... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`;
       reconnectTimer = setTimeout(() => {
         console.log('🔄 재연결 시도');
         connectWebSocket();
       }, 5000);
+    } else if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      console.error('최대 재연결 시도 횟수 초과. 연결을 중단합니다.');
+      error.value = '서버 연결이 불안정합니다. 생성 상태를 확인해주세요.';
+      isGenerating.value = false;
     }
   };
 };
@@ -451,6 +476,8 @@ const disconnectWebSocket = () => {
     websocket = null;
     console.log('⏹️ WebSocket 종료');
   }
+
+  reconnectAttempts = 0; // 재연결 카운터 리셋
 };
 
 const handleAuthCheck = (event: FocusEvent) => {
