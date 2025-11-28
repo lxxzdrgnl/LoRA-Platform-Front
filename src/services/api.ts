@@ -125,12 +125,22 @@ export interface TrainingJobResponse {
   startedAt?: string;
   completedAt?: string;
   createdAt: string;
+  // 학습 파라미터 정보 (백엔드에서 추가됨)
+  modelName: string;
+  modelDescription?: string;
+  trainingImagesCount: number;
+  epochs: number;
+  learningRate: number;
+  loraRank: number;
+  baseModel: string;
+  triggerWord?: string;
+  modelThumbnailUrl?: string;
 }
 
+// Deprecated: TrainingJobResponse now includes all necessary fields
 export interface TrainingJobWithModelResponse extends TrainingJobResponse {
   modelTitle?: string;
   modelThumbnail?: string;
-  baseModel?: string;
 }
 
 export interface GenerateConfig {

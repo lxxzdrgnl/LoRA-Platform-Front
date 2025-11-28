@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { api } from '../../services/api';
 import type { TrainingJobWithModelResponse } from '../../services/api';
 import TrainingHistoryDetailModal from './TrainingHistoryDetailModal.vue';
@@ -11,16 +11,16 @@ defineProps<{
 const emit = defineEmits(['delete-job']);
 
 const showModal = ref(false);
-const selectedJobId = ref<number | null>(null);
+const selectedJob = ref<TrainingJobWithModelResponse | null>(null);
 
-const openModal = (jobId: number) => {
-  selectedJobId.value = jobId;
+const openModal = (job: TrainingJobWithModelResponse) => {
+  selectedJob.value = job;
   showModal.value = true;
 };
 
 const closeModal = () => {
   showModal.value = false;
-  selectedJobId.value = null;
+  selectedJob.value = null;
 };
 
 const handleDeleted = (jobId: number) => {
@@ -84,7 +84,7 @@ const getIconStatusClass = (status: string) => {
           v-for="training in trainingHistory"
           :key="training.id"
           class="history-item"
-          @click="openModal(training.id)"
+          @click="openModal(training)"
         >
           <div class="status-icon" :class="getIconStatusClass(training.status)">
             <svg v-if="training.status === 'COMPLETED'" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
@@ -116,7 +116,7 @@ const getIconStatusClass = (status: string) => {
     <!-- Detail Modal -->
     <TrainingHistoryDetailModal
       :show="showModal"
-      :job-id="selectedJobId"
+      :job="selectedJob"
       @close="closeModal"
       @deleted="handleDeleted"
     />
@@ -165,6 +165,38 @@ const getIconStatusClass = (status: string) => {
     display: flex;
     align-items: center;
     justify-content: center;
-    /* The background and color are now handled by badge classes */
+}
+
+.status-icon.badge-success {
+    background-color: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+}
+
+.status-icon.badge-primary {
+    background-color: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+}
+
+.status-icon.badge-error {
+    background-color: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+.badge-success {
+    background-color: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+    font-weight: 600;
+}
+
+.badge-error {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    font-weight: 600;
+}
+
+.badge-primary {
+    background-color: rgba(59, 130, 246, 0.2);
+    color: #3b82f6;
+    font-weight: 600;
 }
 </style>

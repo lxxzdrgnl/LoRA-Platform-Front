@@ -1,52 +1,154 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
-import { api } from '../../services/api';
-import type { TrainingJobResponse, LoraModel } from '../../services/api';
+import { ref, watch, onUnmounted, computed } from 'vue';
+import { api, getWebSocketUrl } from '../../services/api';
+import type { TrainingJobResponse, TrainingJobWithModelResponse } from '../../services/api';
 
 const props = defineProps<{
   show: boolean;
-  jobId: number | null;
+  job: TrainingJobWithModelResponse | null;
 }>();
 
 const emit = defineEmits(['close', 'deleted']);
 
-const loading = ref(true);
+const loading = ref(false);
 const error = ref('');
-const job = ref<TrainingJobResponse | null>(null);
-const model = ref<LoraModel | null>(null);
+const jobData = ref<TrainingJobResponse | null>(null);
+const currentUserId = ref<number | null>(null);
 
-watch(() => props.jobId, async (newId) => {
-  if (newId) {
-    await fetchJobDetails(newId);
+let websocket: WebSocket | null = null;
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+
+// Computed properties for model information (from TrainingJobResponse)
+const modelTitle = computed(() => props.job?.modelTitle || props.job?.modelName || 'N/A');
+const baseModel = computed(() => props.job?.baseModel || 'N/A');
+const modelThumbnail = computed(() => props.job?.modelThumbnail || props.job?.modelThumbnailUrl);
+const trainingImagesCount = computed(() => props.job?.trainingImagesCount || 0);
+
+// Merge job data with real-time updates
+const currentJob = computed(() => {
+  if (!props.job) return null;
+  // Use real-time data if available, otherwise use props
+  return jobData.value ? {
+    ...props.job,
+    ...jobData.value
+  } : props.job;
+});
+
+watch(() => props.job, async (newJob) => {
+  if (newJob) {
+    // Initialize with passed job data
+    jobData.value = newJob;
+
+    // Get user ID for WebSocket
+    if (!currentUserId.value) {
+      try {
+        const userResponse = await api.user.getMyProfile();
+        currentUserId.value = userResponse.data.id;
+      } catch (err) {
+        console.error('Failed to get user profile:', err);
+      }
+    }
+
+    // Connect to WebSocket if job is in progress
+    if (newJob.status === 'IN_PROGRESS' || newJob.status === 'TRAINING') {
+      connectWebSocket();
+    }
   }
 });
 
-const fetchJobDetails = async (id: number) => {
+watch(() => props.show, (isShown) => {
+  if (!isShown) {
+    disconnectWebSocket();
+  }
+});
+
+
+const connectWebSocket = () => {
+  if (websocket) websocket.close();
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+
+  const userId = currentUserId.value || 0;
+  const wsUrl = getWebSocketUrl(`/ws/training?userId=${userId}`);
+
+  console.log(`Detail Modal: Connecting WebSocket to: ${wsUrl}, with userId: ${userId}`);
+
   try {
-    loading.value = true;
-    error.value = '';
+    websocket = new WebSocket(wsUrl);
 
-    // Fetch training job details
-    const jobResponse = await api.training.getTrainingJob(id);
-    job.value = jobResponse.data;
+    websocket.onopen = () => {
+      console.log('Detail Modal: WebSocket connected successfully');
+      heartbeatTimer = setInterval(() => {
+        if (websocket && websocket.readyState === WebSocket.OPEN) {
+          websocket.send(JSON.stringify({ type: 'ping' }));
+        }
+      }, 30000);
+    };
 
-    // Fetch model details
-    if (job.value?.modelId) {
-      const modelResponse = await api.models.getModelDetail(job.value.modelId);
-      model.value = modelResponse.data;
-    }
+    websocket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      console.log('Detail Modal: WebSocket message received:', data);
+
+      if (data.type === 'pong') return;
+
+      // Only update if this is the job we're watching
+      if (props.job && data.jobId && data.jobId !== props.job.id) {
+        console.log(`Detail Modal: Ignoring message for different job: ${data.jobId} (current: ${props.job.id})`);
+        return;
+      }
+
+      // Update job details based on WebSocket message
+      if (jobData.value) {
+        if (data.status === 'SUCCESS' || data.status === 'COMPLETED') {
+          jobData.value.status = 'COMPLETED';
+          jobData.value.completedAt = new Date().toISOString();
+          disconnectWebSocket();
+        } else if (data.status === 'FAILED' || data.status === 'FAIL') {
+          jobData.value.status = 'FAILED';
+          jobData.value.errorMessage = data.message || data.error || 'Training failed';
+          disconnectWebSocket();
+        } else if (data.status === 'TRAINING') {
+          jobData.value.status = 'TRAINING';
+          if (data.currentEpoch !== null && data.currentEpoch !== undefined) {
+            jobData.value.currentEpoch = data.currentEpoch;
+          }
+          if (data.phase) {
+            jobData.value.phase = data.phase;
+          }
+        } else {
+          // Update phase for other statuses
+          if (data.status) {
+            jobData.value.phase = data.status;
+          }
+        }
+      }
+    };
+
+    websocket.onerror = (event) => {
+      console.error('Detail Modal: WebSocket error:', event);
+    };
+
+    websocket.onclose = (event) => {
+      console.log('Detail Modal: WebSocket closed:', event.code, event.reason);
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
+    };
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to load training job details.';
-  } finally {
-    loading.value = false;
+    console.error('Detail Modal: Failed to create WebSocket:', err);
+  }
+};
+
+const disconnectWebSocket = () => {
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  if (websocket) {
+    websocket.close();
+    websocket = null;
   }
 };
 
 const deleteJob = async () => {
-  if (!props.jobId || !confirm('Are you sure you want to delete this training job? This action cannot be undone.')) return;
+  if (!props.job || !confirm('Are you sure you want to delete this training job? This action cannot be undone.')) return;
   try {
-    await api.training.deleteTrainingJob(props.jobId);
-    emit('deleted', props.jobId);
+    await api.training.deleteTrainingJob(props.job.id);
+    emit('deleted', props.job.id);
     closeModal();
   } catch (err) {
     console.error('Failed to delete training job:', err);
@@ -55,10 +157,14 @@ const deleteJob = async () => {
 };
 
 const closeModal = () => {
+  disconnectWebSocket();
   emit('close');
-  job.value = null;
-  model.value = null;
+  jobData.value = null;
 };
+
+onUnmounted(() => {
+  disconnectWebSocket();
+});
 
 const formatDate = (dateString?: string) => {
   if (!dateString) return 'N/A';
@@ -100,15 +206,15 @@ const getStatusClass = (status: string) => {
         <div v-else-if="error" class="card text-center p-xl text-error bg-red-500/10">
           {{ error }}
         </div>
-        <div v-else-if="job && model" class="grid grid-cols-2 gap-xl">
+        <div v-else-if="currentJob" class="grid grid-cols-2 gap-xl">
           <!-- Left: Model Info -->
           <div class="card">
             <h2 class="text-2xl font-bold mb-lg gradient-text">Model Information</h2>
             <div class="model-preview mb-lg">
               <img
-                v-if="model.thumbnailUrl"
-                :src="model.thumbnailUrl"
-                :alt="model.title"
+                v-if="modelThumbnail"
+                :src="modelThumbnail"
+                :alt="modelTitle"
                 class="model-thumbnail"
               />
               <div v-else class="model-thumbnail-placeholder">
@@ -121,30 +227,25 @@ const getStatusClass = (status: string) => {
             </div>
             <div class="form-group">
               <label class="label">Model Name</label>
-              <p class="font-medium text-primary">{{ model.title }}</p>
-            </div>
-            <div class="form-group" v-if="model.description">
-              <label class="label">Description</label>
-              <p class="text-secondary text-sm">{{ model.description }}</p>
+              <p class="font-medium text-primary">{{ modelTitle }}</p>
             </div>
             <div class="form-group">
               <label class="label">Base Model</label>
-              <p class="font-medium text-primary">{{ model.baseModel }}</p>
+              <p class="font-medium text-primary">{{ baseModel }}</p>
             </div>
             <div class="grid grid-cols-2 gap-md">
               <div class="form-group">
                 <label class="label">Training Images</label>
-                <p class="font-medium text-primary">{{ model.trainingImagesCount }}</p>
+                <p class="font-medium text-primary">{{ trainingImagesCount }}</p>
               </div>
               <div class="form-group">
                 <label class="label">Status</label>
-                <p class="font-medium text-primary">{{ model.status }}</p>
+                <p class="badge" :class="getStatusClass(currentJob.status)">{{ currentJob.status }}</p>
               </div>
             </div>
-            <div class="mt-auto pt-lg">
+            <div v-if="currentJob.status === 'COMPLETED' && currentJob.modelId" class="mt-auto pt-lg">
               <router-link
-                v-if="model.status === 'ACTIVE'"
-                :to="`/models/${model.id}`"
+                :to="`/models/${currentJob.modelId}`"
                 class="btn btn-primary w-full"
               >
                 View Model
@@ -156,64 +257,59 @@ const getStatusClass = (status: string) => {
           <div class="card">
             <h2 class="text-2xl font-bold mb-lg gradient-text">Training Details</h2>
             <div class="form-group">
-              <label class="label">Job ID</label>
-              <p class="font-medium text-primary">#{{ job.id }}</p>
-            </div>
-            <div class="form-group">
               <label class="label">Status</label>
-              <p class="badge" :class="getStatusClass(job.status)">{{ job.status }}</p>
+              <p class="badge" :class="getStatusClass(currentJob.status)">{{ currentJob.status }}</p>
             </div>
 
             <!-- Progress -->
             <div class="form-group">
               <label class="label">Progress</label>
               <div class="progress-info mb-sm">
-                <span class="font-medium text-primary">{{ job.currentEpoch }} / {{ job.totalEpochs }} epochs</span>
-                <span class="text-secondary text-sm">{{ Math.round((job.currentEpoch / job.totalEpochs) * 100) }}%</span>
+                <span class="font-medium text-primary">{{ currentJob.currentEpoch }} / {{ currentJob.totalEpochs }} epochs</span>
+                <span class="text-secondary text-sm">{{ Math.round((currentJob.currentEpoch / currentJob.totalEpochs) * 100) }}%</span>
               </div>
               <div class="progress-bar">
                 <div
                   class="progress-fill"
-                  :style="{ width: `${(job.currentEpoch / job.totalEpochs) * 100}%` }"
+                  :style="{ width: `${(currentJob.currentEpoch / currentJob.totalEpochs) * 100}%` }"
                 ></div>
               </div>
             </div>
 
             <!-- Phase -->
-            <div class="form-group" v-if="job.phase">
+            <div class="form-group" v-if="currentJob.phase">
               <label class="label">Current Phase</label>
-              <p class="font-medium text-primary">{{ job.phase }}</p>
+              <p class="font-medium text-primary">{{ currentJob.phase }}</p>
             </div>
 
             <!-- Timestamps -->
             <div class="grid grid-cols-2 gap-md">
               <div class="form-group">
                 <label class="label">Created</label>
-                <p class="text-sm text-secondary">{{ formatDate(job.createdAt) }}</p>
+                <p class="text-sm text-secondary">{{ formatDate(currentJob.createdAt) }}</p>
               </div>
-              <div class="form-group" v-if="job.startedAt">
+              <div class="form-group" v-if="currentJob.startedAt">
                 <label class="label">Started</label>
-                <p class="text-sm text-secondary">{{ formatDate(job.startedAt) }}</p>
+                <p class="text-sm text-secondary">{{ formatDate(currentJob.startedAt) }}</p>
               </div>
             </div>
-            <div class="form-group" v-if="job.completedAt">
+            <div class="form-group" v-if="currentJob.completedAt">
               <label class="label">Completed</label>
-              <p class="text-sm text-secondary">{{ formatDate(job.completedAt) }}</p>
+              <p class="text-sm text-secondary">{{ formatDate(currentJob.completedAt) }}</p>
             </div>
 
             <!-- Error Message -->
             <div
-              v-if="job.status === 'FAILED' && job.errorMessage"
+              v-if="currentJob.status === 'FAILED' && currentJob.errorMessage"
               class="error-box"
             >
               <label class="label text-error">Error Message</label>
-              <p class="text-sm">{{ job.errorMessage }}</p>
+              <p class="text-sm">{{ currentJob.errorMessage }}</p>
             </div>
 
             <!-- Actions -->
-            <div class="mt-auto pt-lg">
+            <div class="mt-auto pt-lg flex flex-col gap-md">
               <button
-                v-if="job.status === 'FAILED' || job.status === 'COMPLETED'"
                 class="btn w-full text-error"
                 @click="deleteJob"
                 style="background: var(--error-light, rgba(239, 68, 68, 0.1));"

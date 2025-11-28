@@ -11,16 +11,16 @@ interface Props {
 defineProps<Props>();
 
 const showModal = ref(false);
-const selectedJobId = ref<number | null>(null);
+const selectedJob = ref<TrainingJobWithModelResponse | null>(null);
 
-const openModal = (jobId: number) => {
-  selectedJobId.value = jobId;
+const openModal = (job: TrainingJobWithModelResponse) => {
+  selectedJob.value = job;
   showModal.value = true;
 };
 
 const closeModal = () => {
   showModal.value = false;
-  selectedJobId.value = null;
+  selectedJob.value = null;
 };
 
 const handleDeleted = (jobId: number) => {
@@ -43,7 +43,7 @@ const handleDeleted = (jobId: number) => {
         v-for="job in history"
         :key="job.id"
         class="card p-lg history-card"
-        @click="openModal(job.id)"
+        @click="openModal(job)"
       >
         <div class="flex items-center justify-between mb-md">
           <div>
@@ -102,7 +102,7 @@ const handleDeleted = (jobId: number) => {
     <!-- Detail Modal -->
     <TrainingHistoryDetailModal
       :show="showModal"
-      :job-id="selectedJobId"
+      :job="selectedJob"
       @close="closeModal"
       @deleted="handleDeleted"
     />

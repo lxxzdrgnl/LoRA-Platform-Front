@@ -86,32 +86,15 @@ export function useHistory() {
       const response = await api.training.getMyTrainingJobs();
       const jobs: TrainingJobResponse[] = response.data;
 
-      // Fetch model information for each job
-      const jobsWithModelInfo: TrainingJobWithModelResponse[] = await Promise.all(
-        jobs.map(async (job) => {
-          try {
-            const modelResponse = await api.models.getModelDetail(job.modelId);
-            return {
-              ...job,
-              modelTitle: modelResponse.data.title,
-              modelThumbnail: modelResponse.data.thumbnailUrl,
-              baseModel: modelResponse.data.baseModel,
-            };
-          } catch (err) {
-            console.error(`Failed to load model info for job ${job.id}:`, err);
-            // Return job without model info if fetch fails
-            return {
-              ...job,
-              modelTitle: undefined,
-              modelThumbnail: undefined,
-              baseModel: undefined,
-            };
-          }
-        })
-      );
+      // TrainingJobResponse now includes modelName, baseModel, modelThumbnailUrl
+      const jobsWithAlias: TrainingJobWithModelResponse[] = jobs.map(job => ({
+        ...job,
+        modelTitle: job.modelName, // Alias for backward compatibility
+        modelThumbnail: job.modelThumbnailUrl, // Alias for backward compatibility
+      }));
 
-      trainingHistory.value = jobsWithModelInfo;
-      return jobsWithModelInfo;
+      trainingHistory.value = jobsWithAlias;
+      return jobsWithAlias;
     } catch (err) {
       console.error('Failed to load training history:', err);
       error.value = err instanceof Error ? err.message : 'Failed to load training history';
