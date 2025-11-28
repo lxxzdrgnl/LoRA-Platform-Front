@@ -39,23 +39,17 @@ const recommendedEpochs = computed(() => {
   const image_count = trainingImagesCount.value;
   const current_learning_rate = learningRate.value;
 
-  const BASE_STEPS = 2000;
-  const BASE_LR = 1e-4;
+  // 1. 목표: 최소 1500스텝은 하되, 이미지가 많으면 장당 100스텝 비율로 늘림
+  const targetSteps = Math.max(750, image_count * 50); 
 
-  if (image_count <= 0) return null; // Return null to indicate no recommendation
-  if (current_learning_rate <= 0) return 100; // Default if learning rate is invalid
-
-  const ratio = BASE_LR / current_learning_rate;
-  const target_steps = Math.floor(BASE_STEPS * ratio);
-  
-  let calculated_epochs = Math.floor(target_steps / image_count);
-
-  // Safety caps
-  if (calculated_epochs < 10) {
-    calculated_epochs = 10;
-  }
+  // 2. 학습률 보정(LR) + 에포크 환산(나누기)
+  let calculated_epochs = Math.max(10, Math.floor((targetSteps * (0.0001 / current_learning_rate)) / image_count));
 
   return calculated_epochs;
+});
+
+const isTrainingButtonDisabled = computed(() => {
+  return isTraining.value || trainingImagesCount.value < 10 || !title.value.trim();
 });
 
 watch([trainingImagesCount, learningRate], () => {
@@ -392,7 +386,7 @@ const checkActiveTraining = async () => {
       // UI 업데이트
       isTraining.value = true;
       trainingJobId.value = activeJob.id;
-      totalEpochs.value = activeJob.epochs || 0;
+      totalEpochs.value = activeJob.totalEpochs || 0;
       currentEpoch.value = activeJob.currentEpoch || 0;
       statusMessage.value = `Training in progress (${activeJob.status})`;
 
@@ -440,7 +434,7 @@ onUnmounted(() => {
           </div>
           <div v-if="openSections.includes('model-details')" class="accordion-content">
             <div class="form-group">
-              <label class="label">Model Title *</label>
+              <label class="label">Model Name *</label>
               <input v-model="title" type="text" class="input" placeholder="My Custom LoRA Model" :disabled="isTraining" @focus="handleAuthCheck" />
             </div>
             <div class="form-group">
@@ -497,7 +491,7 @@ onUnmounted(() => {
                 <input ref="fileInput" type="file" multiple accept="image/jpeg,image/jpg,image/png,image/webp" style="display: none;" :disabled="isTraining" @change="handleFileSelect" />
                 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="upload-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                 <p class="upload-text">클릭하거나 이미지를 드래그하여 업로드</p>
-                <p class="upload-hint">JPG, JPEG, PNG, WEBP (이미지 당 최대 10MB, 최대 40장)</p>
+                <p class="upload-hint">JPG, JPEG, PNG, WEBP (이미지 당 최대 10MB, 최소 10장, 최대 40장)</p>
               </div>
               <div v-if="uploadError" class="mt-sm text-error text-sm p-sm bg-red-500/10 rounded-lg">{{ uploadError }}</div>
               <div v-if="imagePreviewUrls.length > 0" class="image-preview-grid mt-md">
@@ -548,7 +542,7 @@ onUnmounted(() => {
                             <div class="tooltip-container">
                                 <HelpCircle :size="16" class="text-muted cursor-pointer" />
                                 <div class="tooltip-text">
-                                    전체 학습 데이터셋을 몇 번 반복하여 학습할지 결정합니다. 이미지 개수와 learning rate를 기반으로 계산된 값을 추천합니다.
+                                    전체 학습 데이터셋을 몇 번 반복하여 학습할지 결정합니다. 이미지 개수와 learning rate를 기반으로 계산된 값을 추천합니다. 에포크수에 배치2로 학습됩니다.
                                 </div>
                             </div>
                         </div>
@@ -602,7 +596,7 @@ onUnmounted(() => {
       <div class="flex gap-md mt-lg">
         <button
           class="btn btn-primary flex-1 btn-lg custom-shadow-glow"
-          :disabled="isTraining"
+          :disabled="isTrainingButtonDisabled"
           @click="startTraining"
         >
           {{ isTraining ? 'Training...' : 'Start Training' }}
