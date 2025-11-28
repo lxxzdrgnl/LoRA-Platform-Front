@@ -23,6 +23,7 @@ const error = ref('');
 const currentEpoch = ref(0);
 const totalEpochs = ref(0);
 const statusMessage = ref('');
+const currentUserId = ref<number | null>(null);
 
 // Image upload state
 const selectedImages = ref<File[]>([]);
@@ -166,6 +167,13 @@ const startTraining = async () => {
   }
 
   try {
+    // Get current user ID if not already set
+    if (!currentUserId.value) {
+      const userResponse = await api.user.getMyProfile();
+      currentUserId.value = userResponse.data.id;
+      console.log('Current user ID:', currentUserId.value);
+    }
+
     isTraining.value = true;
     emit('training-status-change', {
       isTraining: true,
@@ -238,10 +246,11 @@ const connectWebSocket = () => {
   if (reconnectTimer) clearTimeout(reconnectTimer);
   if (heartbeatTimer) clearInterval(heartbeatTimer);
 
-  const userId = localStorage.getItem('userId') || '0';
+  // Use the actual user ID from the API
+  const userId = currentUserId.value || 0;
   const wsUrl = getWebSocketUrl(`/ws/training?userId=${userId}`);
 
-  console.log('Attempting WebSocket connection to:', wsUrl);
+  console.log('Attempting WebSocket connection to:', wsUrl, 'with userId:', userId);
   statusMessage.value = 'Connecting to training server...';
 
   try {
@@ -272,7 +281,7 @@ const connectWebSocket = () => {
 
       if (data.status === 'SUCCESS' || data.status === 'COMPLETED') {
         isTraining.value = false;
-        statusMessage.value = 'Training completed successfully!';
+        statusMessage.value = '✅ Training completed successfully!';
         emit('training-status-change', {
           isTraining: false,
           statusMessage: statusMessage.value,
@@ -281,9 +290,9 @@ const connectWebSocket = () => {
         });
         disconnectWebSocket();
         emit('refresh-history');
-      } else if (data.status === 'FAILED') {
+      } else if (data.status === 'FAILED' || data.status === 'FAIL') {
         isTraining.value = false;
-        error.value = data.message || 'Training failed';
+        error.value = data.message || data.error || 'Training failed';
         emit('training-status-change', {
           isTraining: false,
           statusMessage: '',
@@ -293,14 +302,35 @@ const connectWebSocket = () => {
         disconnectWebSocket();
         emit('refresh-history');
       } else {
-        // 진행 상태 업데이트
-        statusMessage.value = data.message || data.status;
+        // 진행 상태에 따라 메시지 포맷팅
+        let formattedMessage = '';
 
-        // epoch 정보가 있으면 업데이트
-        if (data.currentEpoch !== null && data.currentEpoch !== undefined) {
-          currentEpoch.value = data.currentEpoch;
-          console.log(`Epoch updated: ${currentEpoch.value}/${totalEpochs.value}`);
+        if (data.status === 'LOADING') {
+          formattedMessage = '🔄 Loading server...';
+        } else if (data.status === 'DOWNLOADING') {
+          formattedMessage = '⬇️ Downloading training images from S3...';
+        } else if (data.status === 'DOWNLOADING_COMPLETE') {
+          formattedMessage = `✅ Downloaded ${data.message?.match(/\d+/)?.[0] || ''} images`;
+        } else if (data.status === 'PREPROCESSING') {
+          formattedMessage = '🖼️ Processing images (captioning, cropping)...';
+        } else if (data.status === 'CAPTIONING_COMPLETE') {
+          formattedMessage = '✅ Image preprocessing complete';
+        } else if (data.status === 'TRAINING') {
+          // epoch 정보가 있으면 업데이트
+          if (data.currentEpoch !== null && data.currentEpoch !== undefined) {
+            currentEpoch.value = data.currentEpoch;
+            formattedMessage = `🚀 Training model... Epoch ${data.currentEpoch} / ${totalEpochs.value}`;
+            console.log(`Epoch updated: ${currentEpoch.value}/${totalEpochs.value}`);
+          } else {
+            formattedMessage = '🚀 Starting training pipeline...';
+          }
+        } else if (data.status === 'UPLOADING') {
+          formattedMessage = '⬆️ Uploading trained model to S3...';
+        } else {
+          formattedMessage = data.message || data.status;
         }
+
+        statusMessage.value = formattedMessage;
 
         emit('training-status-change', {
           isTraining: true,
@@ -378,6 +408,11 @@ const checkActiveTraining = async () => {
   if (!authStore.isAuthenticated()) return;
 
   try {
+    // Get current user ID first
+    const userResponse = await api.user.getMyProfile();
+    currentUserId.value = userResponse.data.id;
+    console.log('Current user ID:', currentUserId.value);
+
     const response = await api.training.getMyActiveTrainingJob();
     if (response.data) {
       const activeJob = response.data;

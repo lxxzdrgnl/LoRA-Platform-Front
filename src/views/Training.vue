@@ -34,17 +34,29 @@ const handleTrainingStatusChange = (status: TrainingStatus) => {
           <h2 class="text-2xl font-bold mb-md gradient-text">Training Progress</h2>
           <div class="progress-section">
             <div v-if="trainingStatus.isTraining">
-              <div class="flex justify-between mb-sm">
-                <span class="text-sm text-secondary">{{ trainingStatus.statusMessage }}</span>
-                <span class="text-sm font-semibold">Epoch {{ trainingStatus.currentEpoch }} / {{ trainingStatus.totalEpochs }}</span>
+              <!-- Status Message -->
+              <div class="mb-md p-md rounded-lg bg-blue-500/10 border border-blue-500/30">
+                <p class="text-base text-blue-400 font-medium">{{ trainingStatus.statusMessage }}</p>
               </div>
-              <div class="progress-bar">
-                <div class="progress-fill" :style="{ width: `${trainingStatus.totalEpochs > 0 ? (trainingStatus.currentEpoch / trainingStatus.totalEpochs) * 100 : 0}%` }"></div>
+
+              <!-- Epoch Progress (only show during TRAINING phase) -->
+              <div v-if="trainingStatus.currentEpoch > 0 && trainingStatus.totalEpochs > 0" class="mt-md">
+                <div class="flex justify-between mb-sm">
+                  <span class="text-sm font-semibold text-secondary">Training Progress</span>
+                  <span class="text-sm font-bold text-primary">Epoch {{ trainingStatus.currentEpoch }} / {{ trainingStatus.totalEpochs }}</span>
+                </div>
+                <div class="progress-bar">
+                  <div class="progress-fill" :style="{ width: `${(trainingStatus.currentEpoch / trainingStatus.totalEpochs) * 100}%` }"></div>
+                </div>
+                <div class="flex justify-between mt-xs">
+                  <span class="text-xs text-muted">{{ Math.round((trainingStatus.currentEpoch / trainingStatus.totalEpochs) * 100) }}% Complete</span>
+                  <span class="text-xs text-muted">{{ trainingStatus.totalEpochs - trainingStatus.currentEpoch }} epochs remaining</span>
+                </div>
               </div>
             </div>
             <div v-else class="no-training-message">
               <div class="message-box">
-                <p class="text-sm text-muted">Training has not started yet.</p>
+                <p class="text-sm text-muted">Training has not started yet. Upload images and start training to see progress.</p>
               </div>
             </div>
           </div>
