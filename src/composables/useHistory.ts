@@ -1,9 +1,9 @@
 import { ref } from 'vue';
-import { api, type GenerationHistoryResponse, type TrainingJobResponse, type AvailableModelResponse } from '../services/api';
+import { api, type GenerationHistoryResponse, type TrainingJobResponse, type TrainingJobWithModelResponse, type AvailableModelResponse } from '../services/api';
 
 export function useHistory() {
   const generationHistory = ref<GenerationHistoryResponse[]>([]);
-  const trainingHistory = ref<TrainingJobResponse[]>([]);
+  const trainingHistory = ref<TrainingJobWithModelResponse[]>([]);
   const availableModels = ref<AvailableModelResponse[]>([]);
   const loading = ref(false);
   const error = ref<string | null>(null);
@@ -84,8 +84,34 @@ export function useHistory() {
     error.value = null;
     try {
       const response = await api.training.getMyTrainingJobs();
-      trainingHistory.value = response.data;
-      return response.data;
+      const jobs: TrainingJobResponse[] = response.data;
+
+      // Fetch model information for each job
+      const jobsWithModelInfo: TrainingJobWithModelResponse[] = await Promise.all(
+        jobs.map(async (job) => {
+          try {
+            const modelResponse = await api.models.getModelDetail(job.modelId);
+            return {
+              ...job,
+              modelTitle: modelResponse.data.title,
+              modelThumbnail: modelResponse.data.thumbnailUrl,
+              baseModel: modelResponse.data.baseModel,
+            };
+          } catch (err) {
+            console.error(`Failed to load model info for job ${job.id}:`, err);
+            // Return job without model info if fetch fails
+            return {
+              ...job,
+              modelTitle: undefined,
+              modelThumbnail: undefined,
+              baseModel: undefined,
+            };
+          }
+        })
+      );
+
+      trainingHistory.value = jobsWithModelInfo;
+      return jobsWithModelInfo;
     } catch (err) {
       console.error('Failed to load training history:', err);
       error.value = err instanceof Error ? err.message : 'Failed to load training history';

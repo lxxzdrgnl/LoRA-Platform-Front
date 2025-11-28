@@ -1,13 +1,35 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { api } from '../../services/api';
+import type { TrainingJobWithModelResponse } from '../../services/api';
+import TrainingHistoryDetailModal from './TrainingHistoryDetailModal.vue';
 
 defineProps<{
-  trainingHistory: any[];
+  trainingHistory: TrainingJobWithModelResponse[];
 }>();
 
 const emit = defineEmits(['delete-job']);
 
-const deleteTrainingJob = async (id: number) => {
+const showModal = ref(false);
+const selectedJobId = ref<number | null>(null);
+
+const openModal = (jobId: number) => {
+  selectedJobId.value = jobId;
+  showModal.value = true;
+};
+
+const closeModal = () => {
+  showModal.value = false;
+  selectedJobId.value = null;
+};
+
+const handleDeleted = (jobId: number) => {
+  closeModal();
+  emit('delete-job', jobId);
+};
+
+const deleteTrainingJob = async (id: number, event: Event) => {
+  event.stopPropagation(); // Prevent opening modal when clicking delete
   try {
     await api.training.deleteTrainingJob(id);
     emit('delete-job', id);
@@ -58,7 +80,12 @@ const getIconStatusClass = (status: string) => {
         <p class="text-sm text-muted mt-sm">Start your first training to see it here</p>
       </div>
       <div v-else class="history-list">
-        <div v-for="training in trainingHistory" :key="training.id" class="history-item">
+        <div
+          v-for="training in trainingHistory"
+          :key="training.id"
+          class="history-item"
+          @click="openModal(training.id)"
+        >
           <div class="status-icon" :class="getIconStatusClass(training.status)">
             <svg v-if="training.status === 'COMPLETED'" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
             <svg v-else-if="training.status === 'IN_PROGRESS' || training.status === 'TRAINING'" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="animate-spin"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
@@ -66,10 +93,10 @@ const getIconStatusClass = (status: string) => {
           </div>
           <div class="flex-1">
             <div class="flex items-center justify-between">
-              <h3 class="font-semibold text-lg">Training Job #{{ training.id }}</h3>
+              <h3 class="font-semibold text-lg">{{ training.modelTitle || `Training Job #${training.id}` }}</h3>
               <span class="badge" :class="getBadgeStatusClass(training.status)">{{ training.status }}</span>
             </div>
-            <p class="text-sm text-secondary mb-sm">Model ID: {{ training.modelId }}</p>
+            <p class="text-sm text-secondary mb-sm">{{ training.baseModel || 'Base Model' }}</p>
             <div class="grid grid-cols-2 gap-x-md gap-y-sm text-sm">
               <div><span class="text-muted">Progress:</span> <span class="ml-xs">{{ training.currentEpoch }} / {{ training.totalEpochs }}</span></div>
               <div><span class="text-muted">Phase:</span> <span class="ml-xs">{{ training.phase || 'N/A' }}</span></div>
@@ -78,13 +105,21 @@ const getIconStatusClass = (status: string) => {
             </div>
             <div v-if="training.errorMessage" class="text-sm text-error mt-sm">Error: {{ training.errorMessage }}</div>
           </div>
-          <div class="flex flex-col gap-sm ml-md">
+          <div class="flex flex-col gap-sm ml-md" @click.stop>
             <router-link v-if="training.status === 'COMPLETED'" :to="`/models/${training.modelId}`" class="btn btn-secondary btn-sm">View Model</router-link>
-            <button v-if="training.status === 'FAILED' || training.status === 'COMPLETED'" class="btn btn-ghost btn-sm" @click="deleteTrainingJob(training.id)">Delete</button>
+            <button v-if="training.status === 'FAILED' || training.status === 'COMPLETED'" class="btn btn-ghost btn-sm" @click="deleteTrainingJob(training.id, $event)">Delete</button>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Detail Modal -->
+    <TrainingHistoryDetailModal
+      :show="showModal"
+      :job-id="selectedJobId"
+      @close="closeModal"
+      @deleted="handleDeleted"
+    />
   </div>
 </template>
 
@@ -113,11 +148,13 @@ const getIconStatusClass = (status: string) => {
   background-color: var(--bg-card);
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
-  transition: background-color 0.2s, border-color 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, transform 0.2s;
+  cursor: pointer;
 }
 .history-item:hover {
     background-color: var(--bg-hover);
     border-color: var(--primary);
+    transform: translateY(-2px);
 }
 
 .status-icon {

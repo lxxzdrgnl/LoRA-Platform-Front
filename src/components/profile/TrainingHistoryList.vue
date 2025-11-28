@@ -1,12 +1,33 @@
 <script setup lang="ts">
-import type { TrainingJobResponse } from '../../services/api';
+import { ref } from 'vue';
+import type { TrainingJobWithModelResponse } from '../../services/api';
+import TrainingHistoryDetailModal from '../training/TrainingHistoryDetailModal.vue';
 
 interface Props {
-  history: TrainingJobResponse[];
+  history: TrainingJobWithModelResponse[];
   loading?: boolean;
 }
 
 defineProps<Props>();
+
+const showModal = ref(false);
+const selectedJobId = ref<number | null>(null);
+
+const openModal = (jobId: number) => {
+  selectedJobId.value = jobId;
+  showModal.value = true;
+};
+
+const closeModal = () => {
+  showModal.value = false;
+  selectedJobId.value = null;
+};
+
+const handleDeleted = (jobId: number) => {
+  closeModal();
+  // Emit event to parent to refresh the list
+  window.location.reload(); // Simple reload for now
+};
 </script>
 
 <template>
@@ -18,10 +39,15 @@ defineProps<Props>();
 
     <!-- History List -->
     <div v-else-if="history.length" class="grid grid-cols-1 gap-md">
-      <div v-for="job in history" :key="job.id" class="card p-lg">
+      <div
+        v-for="job in history"
+        :key="job.id"
+        class="card p-lg history-card"
+        @click="openModal(job.id)"
+      >
         <div class="flex items-center justify-between mb-md">
           <div>
-            <h3 class="text-lg font-bold">Training Job #{{ job.id }}</h3>
+            <h3 class="text-lg font-bold">{{ job.modelTitle || `Training Job #${job.id}` }}</h3>
             <p class="text-sm text-muted">{{ new Date(job.createdAt).toLocaleString() }}</p>
           </div>
           <span
@@ -72,5 +98,27 @@ defineProps<Props>();
     <div v-else class="card text-center p-xl">
       <p class="text-secondary text-lg">학습 기록이 없습니다</p>
     </div>
+
+    <!-- Detail Modal -->
+    <TrainingHistoryDetailModal
+      :show="showModal"
+      :job-id="selectedJobId"
+      @close="closeModal"
+      @deleted="handleDeleted"
+    />
   </div>
 </template>
+
+<style scoped>
+.history-card {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.history-card:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+</style>

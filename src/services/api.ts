@@ -127,6 +127,12 @@ export interface TrainingJobResponse {
   createdAt: string;
 }
 
+export interface TrainingJobWithModelResponse extends TrainingJobResponse {
+  modelTitle?: string;
+  modelThumbnail?: string;
+  baseModel?: string;
+}
+
 export interface GenerateConfig {
   modelId: number;
   prompt: string;

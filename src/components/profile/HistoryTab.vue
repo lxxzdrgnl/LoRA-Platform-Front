@@ -2,11 +2,11 @@
 import { ref } from 'vue';
 import GenerationHistoryList from './GenerationHistoryList.vue';
 import TrainingHistoryList from './TrainingHistoryList.vue';
-import type { GenerationHistoryResponse, TrainingJobResponse, AvailableModelResponse } from '../../services/api';
+import type { GenerationHistoryResponse, TrainingJobWithModelResponse, AvailableModelResponse } from '../../services/api';
 
 interface Props {
   generationHistory: GenerationHistoryResponse[];
-  trainingHistory: TrainingJobResponse[];
+  trainingHistory: TrainingJobWithModelResponse[];
   availableModels: AvailableModelResponse[];
   loading?: boolean;
   hasMore?: boolean;

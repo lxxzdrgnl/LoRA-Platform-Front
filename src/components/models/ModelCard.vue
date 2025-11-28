@@ -88,7 +88,7 @@ defineEmits(['click']);
 .model-thumbnail {
   position: relative;
   width: 100%;
-  height: 100%;
+  aspect-ratio: 1;
   overflow: hidden;
   background: var(--bg-hover);
 }
@@ -96,6 +96,7 @@ defineEmits(['click']);
 .placeholder-thumbnail {
   width: 100%;
   height: 100%;
+  aspect-ratio: 1;
   display: flex;
   align-items: center;
   justify-content: center;

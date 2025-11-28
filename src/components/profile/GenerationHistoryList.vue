@@ -222,6 +222,14 @@ const loadMore = () => {
   /* This div already has relative, aspect-square, w-full, group, rounded-lg from template */
   /* Ensure overflow hidden for image corners */
   overflow: hidden;
+  aspect-ratio: 1;
+  width: 100%;
+}
+
+.history-thumbnail > div {
+  width: 100%;
+  height: 100%;
+  background: var(--bg-hover);
 }
 
 /* Add an explicit hover effect for the image to scale, similar to ModelCard */
