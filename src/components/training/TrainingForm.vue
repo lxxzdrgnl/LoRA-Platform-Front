@@ -15,7 +15,6 @@ const learningRate = ref(0.0001);
 const epochs = ref(10);
 const loraRank = ref(32);
 const baseModel = ref('Lykon/AnyLoRA');
-const isPublic = ref(false);
 const skipPreprocessing = ref(false);
 
 const isTraining = ref(false);
@@ -154,36 +153,14 @@ const removeImage = (index: number) => {
   trainingImagesCount.value = selectedImages.value.length;
 };
 
-const uploadImagesToS3 = async (): Promise<string[]> => {
-  if (selectedImages.value.length === 0) {
-    error.value = '업로드할 이미지를 선택해주세요.';
-    return [];
-  }
-
-  statusMessage.value = 'Getting presigned URLs...';
-  try {
-    const fileNames = selectedImages.value.map(file => file.name);
-    // Presigned URL 요청 시 job ID 대신 임시 식별자를 사용할 수 있지만,
-    // 여기서는 먼저 모델과 작업을 생성한 후 ID를 받아 업로드하는 방식을 유지합니다.
-    // 이 부분은 백엔드 API 설계에 따라 달라질 수 있습니다.
-    // 우선 모델 생성 후 받는 Job ID를 사용하겠습니다.
-
-    // 이 함수는 startTraining 내부에서 호출되므로, jobId를 인자로 받아야 합니다.
-    // 지금 구조에서는 startTraining에서 직접 처리하므로 이 함수는 약간의 수정이 필요합니다.
-    // 여기서는 startTraining 로직에 통합되어 있다고 가정하고 진행합니다.
-    // 독립 실행을 위해선 jobId를 받아야 합니다.
-    // 하지만 현재 로직은 startTraining에서 모든것을 관장하므로, 이 함수를 직접 호출하지 않습니다.
-    // startTraining 로직을 그대로 가져오겠습니다.
-    return []; // 이 함수는 startTraining으로 이전되었습니다.
-  } catch (err) {
-    error.value = `Failed to upload images: ${err instanceof Error ? err.message : 'Unknown error'}`;
-    return [];
-  }
-};
-
-
 const startTraining = async () => {
   if (!authStore.requireAuth()) return;
+
+  // 중복 클릭 방지
+  if (isTraining.value) {
+    console.log('Training already in progress, ignoring duplicate click');
+    return;
+  }
 
   if (!title.value.trim()) {
     error.value = 'Please enter a model title';
@@ -269,68 +246,91 @@ const connectWebSocket = () => {
 
   const userId = localStorage.getItem('userId') || '0';
   const wsUrl = getWebSocketUrl(`/ws/training?userId=${userId}`);
+
+  console.log('Attempting WebSocket connection to:', wsUrl);
   statusMessage.value = 'Connecting to training server...';
-  websocket = new WebSocket(wsUrl);
 
-  websocket.onopen = () => {
-    heartbeatTimer = setInterval(() => {
-      if (websocket && websocket.readyState === WebSocket.OPEN) {
-        websocket.send(JSON.stringify({ type: 'ping' }));
+  try {
+    websocket = new WebSocket(wsUrl);
+
+    websocket.onopen = () => {
+      console.log('WebSocket connected successfully');
+      statusMessage.value = 'Connected to training server';
+      error.value = ''; // Clear any previous errors
+
+      heartbeatTimer = setInterval(() => {
+        if (websocket && websocket.readyState === WebSocket.OPEN) {
+          websocket.send(JSON.stringify({ type: 'ping' }));
+        }
+      }, 30000);
+    };
+
+    websocket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'pong') return;
+
+      if (trainingJobId.value && data.jobId && data.jobId !== trainingJobId.value) {
+          return;
       }
-    }, 30000);
-  };
 
-  websocket.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    if (data.type === 'pong') return;
+      if (data.status === 'SUCCESS' || data.status === 'COMPLETED') {
+        isTraining.value = false;
+        statusMessage.value = 'Training completed successfully!';
+        emit('training-status-change', {
+          isTraining: false,
+          statusMessage: statusMessage.value,
+          currentEpoch: currentEpoch.value,
+          totalEpochs: totalEpochs.value
+        });
+        disconnectWebSocket();
+        emit('refresh-history');
+      } else if (data.status === 'FAILED') {
+        isTraining.value = false;
+        error.value = data.message || 'Training failed';
+        emit('training-status-change', {
+          isTraining: false,
+          statusMessage: '',
+          currentEpoch: 0,
+          totalEpochs: 0
+        });
+        disconnectWebSocket();
+        emit('refresh-history');
+      } else {
+        statusMessage.value = data.message || data.status;
+        emit('training-status-change', {
+          isTraining: true,
+          statusMessage: statusMessage.value,
+          currentEpoch: currentEpoch.value,
+          totalEpochs: totalEpochs.value
+        });
+      }
+    };
 
-    if (trainingJobId.value && data.jobId && data.jobId !== trainingJobId.value) {
-        return;
-    }
+    websocket.onerror = (event) => {
+      console.error('WebSocket error:', event);
+      console.error('WebSocket URL:', wsUrl);
+      // Don't show error immediately - wait for close event
+    };
 
-    if (data.status === 'SUCCESS' || data.status === 'COMPLETED') {
-      isTraining.value = false;
-      statusMessage.value = 'Training completed successfully!';
-      emit('training-status-change', {
-        isTraining: false,
-        statusMessage: statusMessage.value,
-        currentEpoch: currentEpoch.value,
-        totalEpochs: totalEpochs.value
-      });
-      disconnectWebSocket();
-      emit('refresh-history');
-    } else if (data.status === 'FAILED') {
-      isTraining.value = false;
-      error.value = data.message || 'Training failed';
-      emit('training-status-change', {
-        isTraining: false,
-        statusMessage: '',
-        currentEpoch: 0,
-        totalEpochs: 0
-      });
-      disconnectWebSocket();
-      emit('refresh-history');
-    } else {
-      statusMessage.value = data.message || data.status;
-      emit('training-status-change', {
-        isTraining: true,
-        statusMessage: statusMessage.value,
-        currentEpoch: currentEpoch.value,
-        totalEpochs: totalEpochs.value
-      });
-    }
-  };
+    websocket.onclose = (event) => {
+      console.log('WebSocket closed:', event.code, event.reason);
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
 
-  websocket.onerror = () => {
-    error.value = 'WebSocket connection error';
-  };
+      if (isTraining.value) {
+        console.log('Training in progress, will reconnect in 5 seconds...');
+        statusMessage.value = 'Reconnecting to training server...';
+        reconnectTimer = setTimeout(connectWebSocket, 5000);
+      }
+    };
+  } catch (err) {
+    console.error('Failed to create WebSocket:', err);
+    error.value = `Failed to connect to training server: ${err instanceof Error ? err.message : 'Unknown error'}`;
 
-  websocket.onclose = () => {
-    if (heartbeatTimer) clearInterval(heartbeatTimer);
     if (isTraining.value) {
+      // Retry connection
       reconnectTimer = setTimeout(connectWebSocket, 5000);
     }
-  };
+  }
 };
 
 const disconnectWebSocket = () => {
