@@ -40,7 +40,7 @@ const recommendedEpochs = computed(() => {
   const current_learning_rate = learningRate.value;
 
   // 1. 목표: 최소 1500스텝은 하되, 이미지가 많으면 장당 100스텝 비율로 늘림
-  const targetSteps = Math.max(750, image_count * 50); 
+  const targetSteps = Math.max(1500, image_count * 100); 
 
   // 2. 학습률 보정(LR) + 에포크 환산(나누기)
   let calculated_epochs = Math.max(10, Math.floor((targetSteps * (0.0001 / current_learning_rate)) / image_count));
@@ -600,13 +600,6 @@ onUnmounted(() => {
           @click="startTraining"
         >
           {{ isTraining ? 'Training...' : 'Start Training' }}
-        </button>
-        <button
-          v-if="isTraining"
-          class="btn btn-secondary btn-lg"
-          @click="cancelTraining"
-        >
-          Cancel
         </button>
       </div>
 
