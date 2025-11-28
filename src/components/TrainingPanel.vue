@@ -32,7 +32,7 @@ const trainingJobId = ref<number | null>(null); // New ref for training job ID
 
 let eventSource: EventSource | null = null;
 let heartbeatTimer: number | null = null;
-const HEARTBEAT_TIMEOUT = 60000; // 60초 동안 업데이트가 없으면 연결 끊김으로 간주
+const HEARTBEAT_TIMEOUT = 300000; // 5분 동안 업데이트가 없으면 연결 끊김으로 간주
 
 const updateRecommendedEpochs = (imageCount: number) => {
   // This is a placeholder for actual epoch calculation logic

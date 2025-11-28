@@ -267,9 +267,12 @@ const connectWebSocket = () => {
 
     websocket.onmessage = (event) => {
       const data = JSON.parse(event.data);
+      console.log('WebSocket message received:', data);
+
       if (data.type === 'pong') return;
 
       if (trainingJobId.value && data.jobId && data.jobId !== trainingJobId.value) {
+          console.log(`Ignoring message for different job: ${data.jobId} (current: ${trainingJobId.value})`);
           return;
       }
 
@@ -296,7 +299,15 @@ const connectWebSocket = () => {
         disconnectWebSocket();
         emit('refresh-history');
       } else {
+        // 진행 상태 업데이트
         statusMessage.value = data.message || data.status;
+
+        // epoch 정보가 있으면 업데이트
+        if (data.currentEpoch !== null && data.currentEpoch !== undefined) {
+          currentEpoch.value = data.currentEpoch;
+          console.log(`Epoch updated: ${currentEpoch.value}/${totalEpochs.value}`);
+        }
+
         emit('training-status-change', {
           isTraining: true,
           statusMessage: statusMessage.value,
@@ -367,6 +378,44 @@ const handleAuthCheck = (event: FocusEvent) => {
     authStore.requireAuth();
   }
 };
+
+// 페이지 로드 시 진행 중인 학습 작업 확인
+const checkActiveTraining = async () => {
+  if (!authStore.isAuthenticated()) return;
+
+  try {
+    const response = await api.training.getMyActiveTrainingJob();
+    if (response.data) {
+      const activeJob = response.data;
+      console.log('Active training job found:', activeJob);
+
+      // UI 업데이트
+      isTraining.value = true;
+      trainingJobId.value = activeJob.id;
+      totalEpochs.value = activeJob.epochs || 0;
+      currentEpoch.value = activeJob.currentEpoch || 0;
+      statusMessage.value = `Training in progress (${activeJob.status})`;
+
+      emit('training-status-change', {
+        isTraining: true,
+        statusMessage: statusMessage.value,
+        currentEpoch: currentEpoch.value,
+        totalEpochs: totalEpochs.value
+      });
+
+      // WebSocket 연결
+      connectWebSocket();
+    }
+  } catch (err) {
+    console.error('Failed to check active training:', err);
+  }
+};
+
+// 컴포넌트 마운트 시 진행 중인 작업 확인
+import { onMounted } from 'vue';
+onMounted(() => {
+  checkActiveTraining();
+});
 
 onUnmounted(() => {
   disconnectWebSocket();

@@ -753,6 +753,13 @@ export const api = {
       return handleResponse(response);
     },
 
+    async getMyActiveTrainingJob(): Promise<ApiResponse<TrainingJobResponse | null>> {
+      const response = await authenticatedFetch(`${API_BASE_URL}/api/training/my/active`, {
+        headers: getAuthHeaders(),
+      });
+      return handleResponse(response);
+    },
+
     async deleteTrainingJob(jobId: number): Promise<ApiResponse<void>> {
       const response = await authenticatedFetch(`${API_BASE_URL}/api/training/jobs/${jobId}/fail`, {
         method: 'POST',
