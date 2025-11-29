@@ -947,18 +947,34 @@ const handleCompleteEdit = async () => {
 
   /* Adjust available images grid on mobile */
   .available-images-grid {
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)) !important;
-  }
-
-  .current-samples-grid {
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)) !important;
-  }
-
-  /* Fix available images grid to show 2 columns on mobile */
-  .available-images-grid {
+    display: grid !important;
     grid-template-columns: repeat(2, 1fr) !important;
     gap: var(--space-sm) !important;
     max-height: 400px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch; /* iOS smooth scrolling */
+  }
+
+  .current-samples-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: var(--space-sm) !important;
+    max-height: 500px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch; /* iOS smooth scrolling */
+  }
+
+  .available-image-item,
+  .sample-item-draggable {
+    width: 100%;
+    height: auto;
+  }
+
+  .available-image-item img,
+  .sample-item-draggable img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 }
 
