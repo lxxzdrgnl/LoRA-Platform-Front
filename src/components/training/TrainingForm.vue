@@ -587,7 +587,7 @@ onUnmounted(() => {
                             <div class="tooltip-container">
                                 <HelpCircle :size="16" class="text-muted cursor-pointer" />
                                 <div class="tooltip-text">
-                                    전체 학습 데이터셋을 몇 번 반복하여 학습할지 결정합니다. 이미지 개수와 learning rate를 기반으로 계산된 값을 추천합니다. 에포크수에 배치2로 학습됩니다.
+                                    전체 학습 데이터셋을 몇 번 반복하여 학습할지 결정합니다. 이미지 개수와 learning rate를 기반으로 계산된 값을 추천합니다.
                                 </div>
                             </div>
                         </div>
