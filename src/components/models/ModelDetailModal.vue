@@ -715,10 +715,9 @@ const handleCompleteEdit = async () => {
                   <label class="text-sm font-semibold text-muted mb-xs">Details</label>
                   <textarea
                     v-model="editedModelInfo.description"
-                    class="input-field"
+                    class="input-field description-textarea"
                     placeholder="Enter model description"
                     rows="3"
-                    style="width: 100%; padding: 0.75rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); resize: vertical; min-height: 100px;"
                   ></textarea>
                 </div>
                 <div class="flex items-center justify-between mb-lg">
@@ -806,14 +805,14 @@ const handleCompleteEdit = async () => {
                   </template>
                 </div>
                 <div class="flex gap-sm action-buttons">
-                  <button class="btn btn-icon" @click="toggleLike" :class="model.isLiked ? 'btn-primary' : 'btn-secondary'">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" :fill="model.isLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
+                  <button class="btn btn-icon like-button" @click="toggleLike" :class="model.isLiked ? 'btn-primary' : 'btn-secondary'">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" :fill="model.isLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" class="heart-icon">
                       <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                     </svg>
                     {{ model.likeCount }}
                   </button>
-                  <button class="btn btn-primary" @click="openGenerateModal">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <button class="btn btn-primary generate-button" @click="openGenerateModal">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="generate-icon">
                       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                       <polyline points="17 8 12 3 7 8"></polyline>
                       <line x1="12" y1="3" x2="12" y2="15"></line>
@@ -1304,6 +1303,27 @@ const handleCompleteEdit = async () => {
   color: var(--warning, #f59e0b);
 }
 
+/* Description textarea styles */
+.description-textarea {
+  width: 100%;
+  padding: 0.75rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  resize: vertical;
+  min-height: 100px;
+  font-size: 14px;
+}
+
+/* Icon sizes */
+.heart-icon,
+.generate-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
 /* Mobile responsive for visibility section */
 @media (max-width: 768px) {
   .visibility-section > div {
@@ -1315,6 +1335,40 @@ const handleCompleteEdit = async () => {
   .visibility-section .btn {
     flex: 1;
     min-width: auto;
+  }
+
+  /* Larger font size for description textarea on mobile */
+  .description-textarea {
+    font-size: 16px !important;
+    padding: 0.75rem !important;
+    min-height: 120px !important;
+  }
+
+  /* Larger icons on mobile */
+  .heart-icon {
+    width: 20px !important;
+    height: 20px !important;
+  }
+
+  .generate-icon {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  /* Adjust button for better visibility */
+  .like-button {
+    font-size: 16px !important;
+    font-weight: 600 !important;
+  }
+
+  .generate-button {
+    font-size: 15px !important;
+    padding: var(--space-md) var(--space-md) !important;
+  }
+
+  .generate-icon {
+    width: 21px !important;
+    height: 21px !important;
   }
 }
 </style>
