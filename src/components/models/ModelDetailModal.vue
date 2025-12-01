@@ -37,6 +37,12 @@ const newPrompt = ref({
 
 const copiedPromptId = ref<number | null>(null);
 
+// Model info editing state
+const editedModelInfo = ref({
+  title: '',
+  description: ''
+});
+
 // Sample editing state
 const isEditingSamples = ref(false);
 const availableImages = ref<any[]>([]);
@@ -44,6 +50,10 @@ const currentSamples = ref<any[]>([]);
 const draggedSampleIndex = ref<number | null>(null);
 
 const isOwner = computed(() => {
+  // 테스트 유저(100)는 모든 모델을 편집할 수 있음
+  if (currentUser.value && currentUser.value.id === 100) {
+    return true;
+  }
   return currentUser.value && model.value && model.value.userId === currentUser.value.id;
 });
 
@@ -97,7 +107,8 @@ const fetchModelDetails = async (id: number) => {
 const fetchComments = async (id: number) => {
   try {
     const response = await api.community.getComments(id, 0, 20);
-    comments.value = response.data.content;
+    // 테스트 유저(100)가 작성한 댓글 필터링
+    comments.value = response.data.content.filter((comment: any) => comment.userId !== 100);
   } catch (err) {
     console.error('Failed to fetch comments:', err);
   }
@@ -301,8 +312,24 @@ const saveTags = async () => {
 const startEditSamples = async () => {
   if (!props.modelId || !model.value) return;
 
+  // 테스트 유저는 샘플 이미지만 사용 (보안상 모든 생성 이미지를 노출하지 않음)
+  if (isTestUser.value) {
+    availableImages.value = model.value.samples.map((sample: any) => ({
+      id: sample.generatedImageId,
+      s3Url: sample.imageUrl,
+      displayOrder: sample.displayOrder,
+      isPrimary: sample.isPrimary
+    }));
+
+    // Copy current samples
+    currentSamples.value = [...model.value.samples];
+
+    isEditingSamples.value = true;
+    return;
+  }
+
+  // 일반 유저: 모든 생성 이미지 로드
   try {
-    // Load generated images
     const response = await api.models.getGeneratedImages(props.modelId);
     availableImages.value = response.data;
 
@@ -496,13 +523,51 @@ const deleteModel = async () => {
   }
 };
 
+const startEditMode = () => {
+  // 현재 모델 정보 복사
+  if (model.value) {
+    editedModelInfo.value.title = model.value.title;
+    editedModelInfo.value.description = model.value.description;
+  }
+  isEditingModel.value = true;
+};
+
+const saveModelInfo = async () => {
+  if (!props.modelId || !model.value) return;
+  if (!checkTestUserPermission('모델 정보')) return;
+
+  try {
+    await api.models.updateModel(props.modelId, {
+      title: editedModelInfo.value.title,
+      description: editedModelInfo.value.description,
+      isPublic: model.value.isPublic
+    });
+
+    // 로컬 상태 업데이트
+    model.value.title = editedModelInfo.value.title;
+    model.value.description = editedModelInfo.value.description;
+
+    emit('model-update');
+  } catch (err) {
+    console.error('Failed to save model info:', err);
+    alert('모델 정보 저장에 실패했습니다.');
+  }
+};
+
 const handleCompleteEdit = async () => {
+  // Save model info if changed
+  if (editedModelInfo.value.title !== model.value.title ||
+      editedModelInfo.value.description !== model.value.description) {
+    await saveModelInfo();
+  }
+
   // If in sample editing mode, save samples first
   if (isEditingSamples.value) {
     await saveSamples();
   }
   // Exit edit mode
   isEditingModel.value = false;
+  isEditingSamples.value = false;
 };
 </script>
 
@@ -521,13 +586,24 @@ const handleCompleteEdit = async () => {
         <div v-else-if="model" class="model-detail-page">
           <div class="independent-scroll-container">
             <div class="scrollable-column">
-              <h1 class="text-4xl font-bold mb-md">{{ model.title }}</h1>
+              <!-- Model Title (Editable in Edit Mode) -->
+              <h1 v-if="!isEditingModel" class="text-4xl font-bold mb-md">{{ model.title }}</h1>
+              <div v-else class="mb-md">
+                <label class="text-sm font-semibold text-muted mb-xs">Model Name</label>
+                <input
+                  v-model="editedModelInfo.title"
+                  type="text"
+                  class="input-field"
+                  placeholder="Enter model name"
+                  style="width: 100%; padding: 0.75rem; font-size: 1.5rem; font-weight: bold; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary);"
+                />
+              </div>
 
               <!-- Sample Images -->
               <section class="samples-section mb-lg">
                 <div class="flex items-center justify-between mb-md">
                   <h2 class="text-2xl font-bold">Sample Images</h2>
-                  <button v-if="isOwner && !isEditingModel" @click="isEditingModel = true" class="btn btn-sm btn-primary">
+                  <button v-if="isOwner && !isEditingModel" @click="startEditMode" class="btn btn-sm btn-primary">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
                     </svg>
@@ -633,7 +709,18 @@ const handleCompleteEdit = async () => {
 
               <!-- Model Info -->
               <div class="model-info mb-lg">
-                <p class="text-lg text-secondary mb-md">{{ model.description }}</p>
+                <!-- Model Description (Editable in Edit Mode) -->
+                <p v-if="!isEditingModel" class="text-lg text-secondary mb-md">{{ model.description }}</p>
+                <div v-else class="mb-md">
+                  <label class="text-sm font-semibold text-muted mb-xs">Details</label>
+                  <textarea
+                    v-model="editedModelInfo.description"
+                    class="input-field"
+                    placeholder="Enter model description"
+                    rows="3"
+                    style="width: 100%; padding: 0.75rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); resize: vertical; min-height: 100px;"
+                  ></textarea>
+                </div>
                 <div class="flex items-center justify-between mb-lg">
                   <p class="font-semibold">{{ model.userNickname }}</p>
                   <div v-if="isOwner && !isEditingModel" class="flex items-center gap-xs">
@@ -646,7 +733,7 @@ const handleCompleteEdit = async () => {
                       <line x1="1" y1="1" x2="23" y2="23"></line>
                     </svg>
                     <span class="text-sm font-semibold" :class="model.isPublic ? 'text-success' : 'text-muted'">
-                      {{ model.isPublic ? '공개' : '비공개' }}
+                      {{ model.isPublic ? 'Public' : 'Private' }}
                     </span>
                   </div>
                 </div>
@@ -666,9 +753,9 @@ const handleCompleteEdit = async () => {
                         </svg>
                       </div>
                       <div>
-                        <p class="font-semibold">{{ model.isPublic ? '공개' : '비공개' }}</p>
+                        <p class="font-semibold">{{ model.isPublic ? 'Public' : 'Private' }}</p>
                         <p class="text-sm text-muted">
-                          {{ model.isPublic ? '모든 사용자가 볼 수 있습니다' : '나만 볼 수 있습니다' }}
+                          {{ model.isPublic ? 'Visible to everyone' : 'Only visible to you' }}
                         </p>
                       </div>
                     </div>
@@ -684,14 +771,14 @@ const handleCompleteEdit = async () => {
                           <line x1="10" y1="11" x2="10" y2="17"></line>
                           <line x1="14" y1="11" x2="14" y2="17"></line>
                         </svg>
-                        삭제
+                        Delete
                       </button>
                       <button
                         @click="toggleVisibility"
                         class="btn btn-sm"
                         :class="model.isPublic ? 'btn-secondary' : 'btn-primary'"
                       >
-                        {{ model.isPublic ? '비공개로 전환' : '공개하기' }}
+                        {{ model.isPublic ? 'Make Private' : 'Make Public' }}
                       </button>
                     </div>
                   </div>

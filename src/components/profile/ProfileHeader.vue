@@ -122,6 +122,8 @@ const saveProfile = () => {
 .profile-avatar {
   width: 120px;
   height: 120px;
+  object-fit: cover;
+  object-position: center;
 }
 
 .stat-item {

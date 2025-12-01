@@ -279,6 +279,7 @@ const handleLogout = async () => {
   height: 32px;
   border-radius: 50%;
   object-fit: cover;
+  object-position: center;
   border: 2px solid var(--border);
 }
 

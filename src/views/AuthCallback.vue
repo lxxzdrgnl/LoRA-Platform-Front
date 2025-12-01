@@ -14,15 +14,16 @@ onMounted(() => {
   console.log('AuthCallback - hash:', hash);
   console.log('AuthCallback - params:', params.toString());
 
-  const accessToken = params.get('accessToken');
-  const refreshToken = params.get('refreshToken');
-  const userId = params.get('userId');
+  // 언더스코어(_)와 카멜케이스 모두 지원
+  const accessToken = params.get('access_token') || params.get('accessToken');
+  const refreshToken = params.get('refresh_token') || params.get('refreshToken');
+  const userId = params.get('user_id') || params.get('userId');
   const email = params.get('email');
   const name = params.get('name');
   const nickname = params.get('nickname');
-  const profileImageUrl = params.get('profileImageUrl');
+  const profileImageUrl = params.get('profile_image_url') || params.get('profileImageUrl');
   const role = params.get('role');
-  const createdAt = params.get('createdAt');
+  const createdAt = params.get('created_at') || params.get('createdAt');
 
   console.log('AuthCallback - accessToken:', accessToken ? 'exists' : 'missing');
   console.log('AuthCallback - refreshToken:', refreshToken ? 'exists' : 'missing');
