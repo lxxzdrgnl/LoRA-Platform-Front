@@ -47,6 +47,23 @@ const isOwner = computed(() => {
   return currentUser.value && model.value && model.value.userId === currentUser.value.id;
 });
 
+const isTestUser = computed(() => {
+  return currentUser.value && currentUser.value.id === 100;
+});
+
+const canEditSamples = computed(() => {
+  return isOwner.value || isTestUser.value;
+});
+
+// 테스트 유저 권한 체크 헬퍼 함수
+const checkTestUserPermission = (action: string): boolean => {
+  if (isTestUser.value) {
+    alert(`테스트 유저는 ${action}을(를) 수정할 수 없습니다. (읽기 전용 모드)`);
+    return false;
+  }
+  return true;
+};
+
 watch(() => props.modelId, async (newId) => {
   if (newId) {
     await loadCurrentUser();
@@ -188,6 +205,7 @@ const resetNewPrompt = () => {
 
 const addNewPrompt = async () => {
   if (!newPrompt.value.title || !newPrompt.value.prompt || !props.modelId) return;
+  if (!checkTestUserPermission('프롬프트')) return;
   try {
     await api.prompts.createPrompt(props.modelId, newPrompt.value);
     await fetchModelDetails(props.modelId);
@@ -204,6 +222,7 @@ const startEditPrompt = (prompt: any) => {
 
 const savePromptEdit = async (promptId: number) => {
   if (!props.modelId) return;
+  if (!checkTestUserPermission('프롬프트')) return;
   try {
     await api.prompts.updatePrompt(props.modelId, promptId, newPrompt.value);
     await fetchModelDetails(props.modelId);
@@ -215,7 +234,9 @@ const savePromptEdit = async (promptId: number) => {
 };
 
 const deletePrompt = async (promptId: number) => {
-  if (!props.modelId || !confirm('Are you sure you want to delete this prompt?')) return;
+  if (!props.modelId) return;
+  if (!checkTestUserPermission('프롬프트')) return;
+  if (!confirm('Are you sure you want to delete this prompt?')) return;
   try {
     await api.prompts.deletePrompt(props.modelId, promptId);
     await fetchModelDetails(props.modelId);
@@ -247,6 +268,7 @@ const cancelEditTags = () => {
 
 const saveTags = async () => {
   if (!props.modelId) return;
+  if (!checkTestUserPermission('태그')) return;
   tagEditingError.value = '';
 
   const newTagNames = tagsInput.value.split(',').map(t => t.trim()).filter(Boolean);
@@ -325,6 +347,7 @@ const toggleImageSelection = (image: any) => {
 
 const saveSamples = async () => {
   if (!props.modelId) return;
+  if (!checkTestUserPermission('샘플')) return;
 
   // Validate: Public models must have at least 1 sample
   if (model.value?.isPublic && currentSamples.value.length === 0) {
@@ -424,6 +447,7 @@ const moveSampleDown = (index: number) => {
 // Visibility toggle
 const toggleVisibility = async () => {
   if (!props.modelId || !model.value) return;
+  if (!checkTestUserPermission('공개 여부')) return;
 
   const newVisibility = !model.value.isPublic;
 
@@ -452,6 +476,7 @@ const toggleVisibility = async () => {
 
 const deleteModel = async () => {
   if (!props.modelId || !model.value) return;
+  if (!checkTestUserPermission('모델')) return;
 
   const confirmMessage = `정말로 "${model.value.title}" 모델을 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없으며, 모든 관련 데이터(샘플, 프롬프트, 댓글 등)가 함께 삭제됩니다.`;
 
@@ -520,7 +545,7 @@ const handleCompleteEdit = async () => {
                       <img :src="sample.imageUrl" alt="Sample" class="img-cover rounded-lg" />
                     </div>
                   </div>
-                  <button v-if="isOwner && isEditingModel" @click="startEditSamples" class="btn btn-sm btn-primary mt-md w-full">
+                  <button v-if="canEditSamples && isEditingModel" @click="startEditSamples" class="btn btn-sm btn-primary mt-md w-full">
                     Edit Samples
                   </button>
                 </div>
