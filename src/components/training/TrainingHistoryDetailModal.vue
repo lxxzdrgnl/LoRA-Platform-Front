@@ -266,12 +266,12 @@ const getStatusClass = (status: string) => {
               <label class="label">Progress</label>
               <div class="progress-info mb-sm">
                 <span class="font-medium text-primary">{{ currentJob.currentEpoch }} / {{ currentJob.totalEpochs }} epochs</span>
-                <span class="text-secondary text-sm">{{ Math.round((currentJob.currentEpoch / currentJob.totalEpochs) * 100) }}%</span>
+                <span class="text-secondary text-sm">{{ Math.round(currentJob.progressPercentage || 0) }}%</span>
               </div>
               <div class="progress-bar">
                 <div
                   class="progress-fill"
-                  :style="{ width: `${(currentJob.currentEpoch / currentJob.totalEpochs) * 100}%` }"
+                  :style="{ width: `${currentJob.progressPercentage || 0}%` }"
                 ></div>
               </div>
             </div>

@@ -135,6 +135,7 @@ export interface TrainingJobResponse {
   baseModel: string;
   triggerWord?: string;
   modelThumbnailUrl?: string;
+  progressPercentage?: number;
 }
 
 // Deprecated: TrainingJobResponse now includes all necessary fields
