@@ -6,7 +6,7 @@ import ModelDetailSkeleton from './ModelDetailSkeleton.vue';
 
 const authStore = useAuthStore();
 
-const props = defineProps<{
+const props = defineProps<{ 
   show: boolean;
   modelId: number | null;
 }>();
@@ -621,13 +621,12 @@ const handleCompleteEdit = async () => {
                       <img :src="sample.imageUrl" alt="Sample" class="img-cover rounded-lg" />
                     </div>
                   </div>
-                  <div v-else class="no-samples-placeholder">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                      <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                      <polyline points="21 15 16 10 5 21"></polyline>
-                    </svg>
-                    <p class="text-muted mt-md">No sample images yet. Edit to add some!</p>
+                  <div v-else class="grid grid-cols-3 gap-lg hide-scrollbar">
+                    <div class="sample-item">
+                      <div class="placeholder-thumbnail">
+                        <span>No Image</span>
+                      </div>
+                    </div>
                   </div>
                   <button v-if="canEditSamples && isEditingModel" @click="startEditSamples" class="btn btn-sm btn-primary mt-md w-full">
                     Edit Samples
@@ -1006,6 +1005,19 @@ const handleCompleteEdit = async () => {
 .sample-item img:hover {
   filter: brightness(1.15);
   opacity: 0.9;
+}
+
+.placeholder-thumbnail {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-hover);
+  color: var(--text-muted);
+  font-size: 14px;
+  border-radius: var(--radius-lg);
 }
 
 @media (max-width: 768px) {
