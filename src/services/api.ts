@@ -1,5 +1,5 @@
 // ========== Configuration ==========
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://blueming-ai-env.eba-gdfew9bx.ap-northeast-2.elasticbeanstalk.com';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://blueming-ai-env-1-env.eba-fdwcr2jd.ap-northeast-2.elasticbeanstalk.com').trim();
 
 export const getWebSocketUrl = (path: string): string => {
   if (API_BASE_URL.startsWith('http')) {
