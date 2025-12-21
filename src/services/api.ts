@@ -298,6 +298,13 @@ const authenticatedFetch = async (url: string, options: RequestInit = {}): Promi
 
   let response = await makeRequest();
 
+  // ✅ 슬라이딩 세션: 백엔드에서 자동 갱신된 토큰 확인
+  const newAccessToken = response.headers.get('X-New-Access-Token');
+  if (newAccessToken) {
+    console.log('✅ 토큰 자동 갱신됨 (슬라이딩 세션)');
+    localStorage.setItem('accessToken', newAccessToken);
+  }
+
   // If 401 Unauthorized, try to refresh token
   if (response.status === 401) {
     if (!isRefreshing) {
