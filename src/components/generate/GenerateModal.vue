@@ -288,7 +288,6 @@ const startGeneration = async () => {
     isGenerating.value = true;
     error.value = '';
     generatedImages.value = [];
-    reconnectAttempts = 0; // 생성 시작 시 재연결 카운터 리셋
 
     // 초기 상태: 모델 불러오는 중 (SSE에서 진행률 오기 전)
     currentStep.value = 0;
@@ -330,8 +329,8 @@ const startGeneration = async () => {
       currentHistoryId = response.data.historyId as number;
       console.log('📝 Generation started. historyId:', currentHistoryId);
 
-      // WebSocket 연결
-      connectWebSocket();
+      // SSE 연결
+      connectSSE();
     } else {
       throw new Error('historyId를 받지 못했습니다');
     }
@@ -440,11 +439,9 @@ const connectSSE = () => {
 const disconnectSSE = () => {
   if (eventSource) {
     eventSource.close();
-    websocket = null;
-    console.log('⏹️ WebSocket 종료');
+    eventSource = null;
+    console.log('⏹️ SSE 종료');
   }
-
-  reconnectAttempts = 0; // 재연결 카운터 리셋
 };
 
 const handleAuthCheck = (event: FocusEvent) => {
@@ -491,8 +488,8 @@ const closeModal = () => {
 };
 
 onUnmounted(() => {
-  // 컴포넌트 언마운트 시 WebSocket 종료
-  disconnectWebSocket();
+  // 컴포넌트 언마운트 시 SSE 종료
+  disconnectSSE();
 });
 </script>
 

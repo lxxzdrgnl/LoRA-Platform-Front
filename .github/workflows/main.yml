@@ -1,4 +1,4 @@
-name: Deploy Vue Frontend to S3
+name: Deploy Vue Frontend to CloudFront
 
 on:
   push:
@@ -41,3 +41,9 @@ jobs:
 
       - name: Deploy to S3
         run: aws s3 sync ./dist s3://${{ secrets.S3_BUCKET_NAME }} --delete
+
+      - name: Invalidate CloudFront Cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
