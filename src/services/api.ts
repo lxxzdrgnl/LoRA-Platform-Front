@@ -267,7 +267,7 @@ const refreshAccessToken = async (): Promise<string> => {
     // Refresh token is invalid or expired
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
-    const frontendUrl = import.meta.env.VITE_FRONTEND_URL || 'http://blueming-front.s3-website.ap-northeast-2.amazonaws.com';
+    const frontendUrl = import.meta.env.VITE_FRONTEND_URL || 'https://d2f4r8lrfwl0ez.cloudfront.net';
     window.location.href = `${frontendUrl}/login`;
     throw new Error('Failed to refresh token');
   }
@@ -981,7 +981,7 @@ export const authStore = {
   requireAuth(): boolean {
     if (!this.isAuthenticated()) {
       alert('Login to continue');
-      const frontendUrl = import.meta.env.VITE_FRONTEND_URL || 'http://blueming-front.s3-website.ap-northeast-2.amazonaws.com';
+      const frontendUrl = import.meta.env.VITE_FRONTEND_URL || 'https://d2f4r8lrfwl0ez.cloudfront.net';
       window.location.href = `${frontendUrl}/login`;
       return false;
     }

@@ -65,11 +65,9 @@ const router = createRouter({
       name: 'test-login',
       component: { template: '<div>Redirecting...</div>' },
       beforeEnter: () => {
-        // 백엔드 API로 리다이렉트
-        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
-        const redirectUrl = `${apiBaseUrl}/api/auth/test`;
-        console.log('Redirecting to:', redirectUrl);
-        console.log('API Base URL:', apiBaseUrl);
+        // CloudFront를 통해 백엔드 API로 리다이렉트 (상대 경로)
+        const redirectUrl = '/api/auth/test';
+        console.log('🔧 Redirecting to:', redirectUrl);
         window.location.href = redirectUrl;
         return false;
       },
