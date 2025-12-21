@@ -351,7 +351,8 @@ const connectSSE = () => {
     eventSource.close();
   }
 
-  const sseUrl = `${import.meta.env.VITE_API_BASE_URL || ''}/api/generate/stream`;
+  const apiBase = (import.meta.env.VITE_API_BASE_URL || 'http://blueming-ai-env-1-env.eba-fdwcr2jd.ap-northeast-2.elasticbeanstalk.com').trim().replace(/\/+$/, '');
+  const sseUrl = `${apiBase}/api/generate/stream`;
 
   console.log(`🔌 SSE 연결 시도: ${sseUrl}`);
   statusMessage.value = '모델 불러오는 중...';
