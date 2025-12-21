@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, onUnmounted, computed } from 'vue';
-import { api, getWebSocketUrl } from '../../services/api';
+import { api } from '../../services/api';
 import type { TrainingJobResponse, TrainingJobWithModelResponse } from '../../services/api';
 
 const props = defineProps<{
@@ -15,8 +15,7 @@ const error = ref('');
 const jobData = ref<TrainingJobResponse | null>(null);
 const currentUserId = ref<number | null>(null);
 
-let websocket: WebSocket | null = null;
-let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+let eventSource: EventSource | null = null;
 
 // Computed properties for model information (from TrainingJobResponse)
 const modelTitle = computed(() => props.job?.modelTitle || props.job?.modelName || 'N/A');
@@ -49,46 +48,71 @@ watch(() => props.job, async (newJob) => {
       }
     }
 
-    // Connect to WebSocket if job is in progress
+    // 🔥 NEW: 진행 중인 작업이면 Redis 캐시에서 진행률 복원
     if (newJob.status === 'IN_PROGRESS' || newJob.status === 'TRAINING') {
-      connectWebSocket();
+      try {
+        const progressResponse = await api.training.getTrainingProgress(newJob.id);
+        if (progressResponse.data) {
+          const cachedProgress = progressResponse.data;
+          console.log('✅ 진행률 복원:', cachedProgress);
+
+          // Redis 캐시에서 복원된 진행률로 업데이트 (Race Condition 방지)
+          if (jobData.value) {
+            if (cachedProgress.currentEpoch !== null && cachedProgress.currentEpoch !== undefined) {
+              jobData.value.currentEpoch = cachedProgress.currentEpoch;
+            }
+            if (cachedProgress.totalEpochs) {
+              jobData.value.totalEpochs = cachedProgress.totalEpochs;
+            }
+            if (cachedProgress.status) {
+              jobData.value.status = cachedProgress.status;
+            }
+            if (cachedProgress.phase) {
+              jobData.value.phase = cachedProgress.phase;
+            }
+          }
+        }
+      } catch (err) {
+        console.log('⚠️ 캐시된 진행률 없음 (정상 - 아직 시작 안 됨)');
+      }
+
+      // SSE 연결
+      connectSSE();
     }
   }
 });
 
 watch(() => props.show, (isShown) => {
   if (!isShown) {
-    disconnectWebSocket();
+    disconnectSSE();
   }
 });
 
 
-const connectWebSocket = () => {
-  if (websocket) websocket.close();
-  if (heartbeatTimer) clearInterval(heartbeatTimer);
+const connectSSE = () => {
+  if (eventSource) eventSource.close();
 
-  const userId = currentUserId.value || 0;
-  const wsUrl = getWebSocketUrl(`/ws/training?userId=${userId}`);
+  // SSE 연결 (JWT 토큰 자동 포함 - 쿠키 또는 withCredentials)
+  const sseUrl = `${import.meta.env.VITE_API_BASE_URL || ''}/api/training/stream`;
 
-  console.log(`Detail Modal: Connecting WebSocket to: ${wsUrl}, with userId: ${userId}`);
+  console.log(`Detail Modal: Connecting SSE to: ${sseUrl}`);
 
   try {
-    websocket = new WebSocket(wsUrl);
+    eventSource = new EventSource(sseUrl, { withCredentials: true });
 
-    websocket.onopen = () => {
-      console.log('Detail Modal: WebSocket connected successfully');
-      heartbeatTimer = setInterval(() => {
-        if (websocket && websocket.readyState === WebSocket.OPEN) {
-          websocket.send(JSON.stringify({ type: 'ping' }));
-        }
-      }, 30000);
+    eventSource.onopen = () => {
+      console.log('Detail Modal: SSE connected successfully');
     };
 
-    websocket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      console.log('Detail Modal: WebSocket message received:', data);
+    // 연결 성공 이벤트
+    eventSource.addEventListener('connected', (event) => {
+      console.log('Detail Modal: SSE connection confirmed:', event.data);
+    });
 
-      if (data.type === 'pong') return;
+    // 학습 진행률 이벤트
+    eventSource.addEventListener('training_progress', (event) => {
+      const data = JSON.parse(event.data);
+      console.log('Detail Modal: SSE training_progress received:', data);
 
       // Only update if this is the job we're watching
       if (props.job && data.jobId && data.jobId !== props.job.id) {
@@ -96,20 +120,25 @@ const connectWebSocket = () => {
         return;
       }
 
-      // Update job details based on WebSocket message
+      // Update job details based on SSE message
       if (jobData.value) {
         if (data.status === 'SUCCESS' || data.status === 'COMPLETED') {
           jobData.value.status = 'COMPLETED';
           jobData.value.completedAt = new Date().toISOString();
-          disconnectWebSocket();
+          disconnectSSE();
         } else if (data.status === 'FAILED' || data.status === 'FAIL') {
           jobData.value.status = 'FAILED';
           jobData.value.errorMessage = data.message || data.error || 'Training failed';
-          disconnectWebSocket();
+          disconnectSSE();
         } else if (data.status === 'TRAINING') {
           jobData.value.status = 'TRAINING';
+          // 🔥 Race Condition 방지: 더 큰 epoch만 갱신
           if (data.currentEpoch !== null && data.currentEpoch !== undefined) {
-            jobData.value.currentEpoch = data.currentEpoch;
+            if (!jobData.value.currentEpoch || data.currentEpoch >= jobData.value.currentEpoch) {
+              jobData.value.currentEpoch = data.currentEpoch;
+            } else {
+              console.log(`⚠️ Race Condition 방지: SSE epoch(${data.currentEpoch}) < 현재(${jobData.value.currentEpoch})`);
+            }
           }
           if (data.phase) {
             jobData.value.phase = data.phase;
@@ -121,26 +150,22 @@ const connectWebSocket = () => {
           }
         }
       }
+    });
+
+    eventSource.onerror = (event) => {
+      console.error('Detail Modal: SSE error:', event);
+      // SSE는 자동 재연결을 시도하므로 여기서는 로그만 출력
     };
 
-    websocket.onerror = (event) => {
-      console.error('Detail Modal: WebSocket error:', event);
-    };
-
-    websocket.onclose = (event) => {
-      console.log('Detail Modal: WebSocket closed:', event.code, event.reason);
-      if (heartbeatTimer) clearInterval(heartbeatTimer);
-    };
   } catch (err) {
-    console.error('Detail Modal: Failed to create WebSocket:', err);
+    console.error('Detail Modal: Failed to create SSE:', err);
   }
 };
 
-const disconnectWebSocket = () => {
-  if (heartbeatTimer) clearInterval(heartbeatTimer);
-  if (websocket) {
-    websocket.close();
-    websocket = null;
+const disconnectSSE = () => {
+  if (eventSource) {
+    eventSource.close();
+    eventSource = null;
   }
 };
 
@@ -157,13 +182,13 @@ const deleteJob = async () => {
 };
 
 const closeModal = () => {
-  disconnectWebSocket();
+  disconnectSSE();
   emit('close');
   jobData.value = null;
 };
 
 onUnmounted(() => {
-  disconnectWebSocket();
+  disconnectSSE();
 });
 
 const formatDate = (dateString?: string) => {
