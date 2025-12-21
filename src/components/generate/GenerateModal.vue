@@ -49,11 +49,7 @@ const statusMessage = ref('');
 const currentUserId = ref<number | null>(null);
 
 let currentHistoryId: number | null = null;
-let websocket: WebSocket | null = null;
-let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
-let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 20; // 최대 20번 재연결 시도 (100초) - 첫 신호가 늦을 수 있음
+let eventSource: EventSource | null = null;
 
 // Watch for the modal to open
 watch(() => props.show, async (newVal) => {
@@ -78,8 +74,8 @@ watch(() => props.show, async (newVal) => {
     // 진행 중인 작업 확인
     await checkOngoingGeneration();
   } else {
-    // 모달 닫을 때 WebSocket 종료
-    disconnectWebSocket();
+    // 모달 닫을 때 SSE 종료
+    disconnectSSE();
     currentHistoryId = null;
   }
 });
@@ -129,6 +125,28 @@ const checkOngoingGeneration = async () => {
       totalSteps.value = response.data.totalSteps || 0;
       statusMessage.value = '모델 불러오는 중...';
 
+      // 🔥 NEW: Redis 캐시에서 진행률 복원
+      try {
+        const progressResponse = await api.generate.getGenerationProgress(currentHistoryId);
+        if (progressResponse.data) {
+          const cachedProgress = progressResponse.data;
+          console.log('✅ 생성 진행률 복원:', cachedProgress);
+
+          // Redis 캐시에서 복원된 진행률로 업데이트
+          if (cachedProgress.currentStep !== null && cachedProgress.currentStep !== undefined) {
+            currentStep.value = cachedProgress.currentStep;
+          }
+          if (cachedProgress.totalSteps) {
+            totalSteps.value = cachedProgress.totalSteps;
+          }
+          if (cachedProgress.message) {
+            statusMessage.value = cachedProgress.message;
+          }
+        }
+      } catch (err) {
+        console.log('⚠️ 캐시된 생성 진행률 없음 (정상 - 아직 시작 안 됨)');
+      }
+
       // 모델 정보 복원
       if (response.data.modelId) {
         await selectModelById(response.data.modelId);
@@ -143,10 +161,10 @@ const checkOngoingGeneration = async () => {
       numImages.value = response.data.numImages || 1;
       seed.value = response.data.seed;
 
-      // WebSocket 연결
-      connectWebSocket();
+      // SSE 연결
+      connectSSE();
 
-      console.log('✅ WebSocket 연결. historyId:', currentHistoryId);
+      console.log('✅ SSE 연결. historyId:', currentHistoryId);
     } else {
       console.log('✅ 진행 중인 작업 없음');
     }
@@ -328,151 +346,100 @@ const startGeneration = async () => {
   }
 };
 
-// WebSocket 연결
-const connectWebSocket = () => {
-  if (websocket) {
-    websocket.close();
+// SSE 연결
+const connectSSE = () => {
+  if (eventSource) {
+    eventSource.close();
   }
 
-  // 타이머 정리
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
-  }
-  if (heartbeatTimer) {
-    clearInterval(heartbeatTimer);
-    heartbeatTimer = null;
-  }
+  const sseUrl = `${import.meta.env.VITE_API_BASE_URL || ''}/api/generate/stream`;
 
-  const userId = currentUserId.value || 0;
-  const wsUrl = getWebSocketUrl(`/ws/generation?userId=${userId}`);
-
-  console.log(`🔌 WebSocket 연결 시도: ${wsUrl}, with userId: ${userId}, attempt: ${reconnectAttempts + 1}`);
+  console.log(`🔌 SSE 연결 시도: ${sseUrl}`);
   statusMessage.value = '모델 불러오는 중...';
 
-  websocket = new WebSocket(wsUrl);
+  try {
+    eventSource = new EventSource(sseUrl, { withCredentials: true });
 
-  websocket.onopen = () => {
-    console.log('✅ WebSocket 연결 성공');
-    reconnectAttempts = 0; // 연결 성공 시 재연결 카운터 리셋
+    eventSource.onopen = () => {
+      console.log('✅ SSE 연결 성공');
+    };
 
-    // Heartbeat 시작 (30초마다 ping 전송)
-    heartbeatTimer = setInterval(() => {
-      if (websocket && websocket.readyState === WebSocket.OPEN) {
-        try {
-          websocket.send(JSON.stringify({ type: 'ping' }));
-          console.log('💓 Heartbeat 전송');
-        } catch (err) {
-          console.error('❌ Heartbeat 전송 실패:', err);
-        }
-      }
-    }, 30000); // 30초
-  };
+    // 연결 성공 이벤트
+    eventSource.addEventListener('connected', (event) => {
+      console.log('✅ SSE connection confirmed:', event.data);
+    });
 
-  websocket.onmessage = (event) => {
-    console.log('📨 WebSocket 메시지:', event.data);
+    // 이미지 생성 진행률 이벤트
+    eventSource.addEventListener('generation_progress', (event) => {
+      console.log('📨 SSE 메시지:', event.data);
 
-    try {
-      const data = JSON.parse(event.data);
-      console.log('📦 파싱된 데이터:', data);
+      try {
+        const data = JSON.parse(event.data);
+        console.log('📦 파싱된 데이터:', data);
 
-      // Pong 메시지 무시
-      if (data.type === 'pong') {
-        console.log('💓 Pong 수신');
-        return;
-      }
-
-      // historyId 필터링 (내 작업만 처리)
-      if (data.historyId !== currentHistoryId) {
-        console.log('⏭️ 다른 작업의 이벤트 무시:', data.historyId);
-        return;
-      }
-
-      if (data.status === 'SUCCESS') {
-        console.log('✅ 생성 완료!', data);
-        isGenerating.value = false;
-        statusMessage.value = 'Generation completed!';
-
-        // S3 URLs 추출
-        if (data.generatedImages && Array.isArray(data.generatedImages)) {
-          generatedImages.value = data.generatedImages.map((img: any) => img.s3Url);
-          console.log('🖼️ 생성된 이미지 URLs:', generatedImages.value);
-        } else {
-          console.error('❌ generatedImages 없음:', data);
-          error.value = '이미지 생성은 완료되었으나 이미지를 찾을 수 없습니다.';
+        // historyId 필터링 (내 작업만 처리)
+        if (data.historyId !== currentHistoryId) {
+          console.log('⏭️ 다른 작업의 이벤트 무시:', data.historyId);
+          return;
         }
 
-        disconnectWebSocket();
-        currentHistoryId = null;
-      } else if (data.status === 'FAILED') {
-        console.error('❌ 생성 실패:', data.message);
-        isGenerating.value = false;
-        error.value = data.message || 'Generation failed';
-        disconnectWebSocket();
-        currentHistoryId = null;
-      } else if (data.status === 'GENERATING') {
-        // 진행률 업데이트
-        if (data.currentStep !== undefined && data.totalSteps !== undefined) {
-          currentStep.value = data.currentStep;
-          totalSteps.value = data.totalSteps;
-          statusMessage.value = `Generating... (${data.currentStep}/${data.totalSteps})`;
-          console.log(`📊 진행률: ${data.currentStep}/${data.totalSteps}`);
-        } else {
-          statusMessage.value = 'Generating...';
-          console.log('📊 상태: GENERATING (진행률 정보 없음)');
+        if (data.status === 'SUCCESS') {
+          console.log('✅ 생성 완료!', data);
+          isGenerating.value = false;
+          statusMessage.value = 'Generation completed!';
+
+          // S3 URLs 추출
+          if (data.generatedImages && Array.isArray(data.generatedImages)) {
+            generatedImages.value = data.generatedImages.map((img: any) => img.s3Url);
+            console.log('🖼️ 생성된 이미지 URLs:', generatedImages.value);
+          } else {
+            console.error('❌ generatedImages 없음:', data);
+            error.value = '이미지 생성은 완료되었으나 이미지를 찾을 수 없습니다.';
+          }
+
+          disconnectSSE();
+          currentHistoryId = null;
+        } else if (data.status === 'FAILED') {
+          console.error('❌ 생성 실패:', data.message);
+          isGenerating.value = false;
+          error.value = data.message || 'Generation failed';
+          disconnectSSE();
+          currentHistoryId = null;
+        } else if (data.status === 'GENERATING') {
+          // 🔥 Race Condition 방지: 더 큰 step만 갱신
+          if (data.currentStep !== undefined && data.totalSteps !== undefined) {
+            if (!currentStep.value || data.currentStep >= currentStep.value) {
+              currentStep.value = data.currentStep;
+              totalSteps.value = data.totalSteps;
+              statusMessage.value = `Generating... (${data.currentStep}/${data.totalSteps})`;
+              console.log(`📊 진행률: ${data.currentStep}/${data.totalSteps}`);
+            } else {
+              console.log(`⚠️ Race Condition 방지: SSE step(${data.currentStep}) < 현재(${currentStep.value})`);
+            }
+          } else {
+            statusMessage.value = 'Generating...';
+            console.log('📊 상태: GENERATING (진행률 정보 없음)');
+          }
         }
+      } catch (err) {
+        console.error('❌ SSE 메시지 파싱 실패:', err, event.data);
       }
-    } catch (err) {
-      console.error('❌ WebSocket 메시지 파싱 실패:', err, event.data);
-    }
-  };
+    });
 
-  websocket.onerror = (evt) => {
-    console.error('❌ WebSocket 에러:', evt);
-    error.value = 'WebSocket 연결 오류';
-  };
+    eventSource.onerror = (event) => {
+      console.error('❌ SSE 에러:', event);
+      // SSE는 자동 재연결 - 에러 로그만 출력
+    };
 
-  websocket.onclose = (event) => {
-    console.log('🔌 WebSocket 연결 종료:', event.code, event.reason);
-
-    // Heartbeat 타이머 정리
-    if (heartbeatTimer) {
-      clearInterval(heartbeatTimer);
-      heartbeatTimer = null;
-    }
-
-    // 진행 중인 작업이 있으면 5초 후 재연결 (최대 10번까지)
-    if (isGenerating.value && currentHistoryId !== null && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-      reconnectAttempts++;
-      console.log(`🔄 5초 후 재연결 시도... (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
-      statusMessage.value = `Reconnecting... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`;
-      reconnectTimer = setTimeout(() => {
-        console.log('🔄 재연결 시도');
-        connectWebSocket();
-      }, 5000);
-    } else if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-      console.error('최대 재연결 시도 횟수 초과. 연결을 중단합니다.');
-      error.value = '서버 연결이 불안정합니다. 생성 상태를 확인해주세요.';
-      isGenerating.value = false;
-    }
-  };
+  } catch (err) {
+    console.error('❌ SSE 생성 실패:', err);
+    error.value = 'SSE 연결 오류';
+  }
 };
 
-const disconnectWebSocket = () => {
-  // 재연결 타이머 취소
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
-  }
-
-  // Heartbeat 타이머 취소
-  if (heartbeatTimer) {
-    clearInterval(heartbeatTimer);
-    heartbeatTimer = null;
-  }
-
-  if (websocket) {
-    websocket.close();
+const disconnectSSE = () => {
+  if (eventSource) {
+    eventSource.close();
     websocket = null;
     console.log('⏹️ WebSocket 종료');
   }

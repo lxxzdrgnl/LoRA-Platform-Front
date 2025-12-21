@@ -801,6 +801,16 @@ export const api = {
       };
       return eventSource;
     },
+
+    /**
+     * Redis 캐시에서 학습 진행률 조회 (새로고침 시 복원용)
+     */
+    async getTrainingProgress(jobId: number): Promise<ApiResponse<Record<string, any> | null>> {
+      const response = await fetch(`${API_BASE_URL}/api/training/jobs/${jobId}/progress`, {
+        headers: getAuthHeaders(),
+      });
+      return handleResponse(response);
+    },
   },
 
   // ========== Generation ==========
@@ -900,6 +910,16 @@ export const api = {
       };
 
       return eventSource;
+    },
+
+    /**
+     * Redis 캐시에서 이미지 생성 진행률 조회 (새로고침 시 복원용)
+     */
+    async getGenerationProgress(historyId: number): Promise<ApiResponse<Record<string, any> | null>> {
+      const response = await fetch(`${API_BASE_URL}/api/generate/history/${historyId}/progress`, {
+        headers: getAuthHeaders(),
+      });
+      return handleResponse(response);
     },
   },
 
