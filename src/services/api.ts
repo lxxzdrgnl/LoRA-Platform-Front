@@ -1,5 +1,7 @@
 // ========== Configuration ==========
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://blueming-ai-env-1-env.eba-fdwcr2jd.ap-northeast-2.elasticbeanstalk.com').trim();
+const rawApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() || '';
+const API_BASE_URL = (rawApiBaseUrl || 'http://blueming-ai-env-1-env.eba-fdwcr2jd.ap-northeast-2.elasticbeanstalk.com').replace(/\/+$/, '');
+console.log('🔧 API_BASE_URL:', API_BASE_URL);
 
 export const getWebSocketUrl = (path: string): string => {
   if (API_BASE_URL.startsWith('http')) {
