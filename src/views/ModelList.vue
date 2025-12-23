@@ -136,7 +136,11 @@ const closeGenerateModal = () => {
 };
 
 const openModelDetailModal = (modelId: number) => {
-  console.log('Opening detail modal for model ID:', modelId);
+  const model = models.value.find(m => m.id === modelId);
+  if (model) {
+    model.viewCount++;
+  }
+
   selectedModelId.value = modelId;
   showModelDetailModal.value = true;
 };
@@ -144,6 +148,18 @@ const openModelDetailModal = (modelId: number) => {
 const closeModelDetailModal = () => {
   showModelDetailModal.value = false;
   selectedModelId.value = null;
+};
+
+const handleModelUpdate = (updatedData?: { id: number; isLiked: boolean; likeCount: number }) => {
+  if (updatedData && typeof updatedData.id !== 'undefined') {
+    const model = models.value.find(m => m.id === updatedData.id);
+    if (model) {
+      model.isLiked = updatedData.isLiked;
+      model.likeCount = updatedData.likeCount;
+    }
+  } else {
+    fetchModels();
+  }
 };
 
 const handleOpenGenerate = (modelId: number) => {
@@ -307,7 +323,7 @@ const handleOpenGenerate = (modelId: number) => {
     :model-id="selectedModelId"
     @close="closeModelDetailModal"
     @open-generate="handleOpenGenerate"
-    @model-update="fetchModels"
+    @model-update="handleModelUpdate"
   />
 </template>
 
