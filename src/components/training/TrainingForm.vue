@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, onUnmounted, computed, watch } from 'vue';
-import { api, authStore, getWebSocketUrl } from '../../services/api';
+import { api, authStore } from '../../services/api';
 import { BookText, Images, BrainCircuit, ChevronDown, HelpCircle } from 'lucide-vue-next';
+
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL?.trim() || 'http://blueming-ai-env-1-env.eba-fdwcr2jd.ap-northeast-2.elasticbeanstalk.com').replace(/\/+$/, '');
 
 const emit = defineEmits(['refresh-history', 'training-status-change']);
 
@@ -59,9 +61,8 @@ watch([trainingImagesCount, learningRate], () => {
     }
 }, { immediate: true }); // immediate: true to run the watcher once immediately on component setup
 
-let websocket: WebSocket | null = null;
+let eventSource: EventSource | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 20; // 최대 20번 재연결 시도 (100초) - 장시간 학습 대응
 
@@ -231,7 +232,7 @@ const startTraining = async () => {
       currentEpoch: currentEpoch.value,
       totalEpochs: totalEpochs.value
     });
-    connectWebSocket();
+    connectSSE();
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to start training';
     isTraining.value = false;
@@ -244,145 +245,142 @@ const startTraining = async () => {
   }
 };
 
-const connectWebSocket = () => {
-  if (websocket) websocket.close();
+const connectSSE = () => {
+  if (eventSource) eventSource.close();
   if (reconnectTimer) clearTimeout(reconnectTimer);
-  if (heartbeatTimer) clearInterval(heartbeatTimer);
 
-  // Use the actual user ID from the API
-  const userId = currentUserId.value || 0;
-  const wsUrl = getWebSocketUrl(`/ws/training?userId=${userId}`);
+  const token = localStorage.getItem('accessToken');
+  if (!token) {
+    error.value = 'Authentication required';
+    return;
+  }
 
-  console.log(`Attempting WebSocket connection to: ${wsUrl}, with userId: ${userId}, attempt: ${reconnectAttempts + 1}`);
+  const sseUrl = `${API_BASE_URL}/api/training/stream?token=${token}`;
+  console.log(`Attempting SSE connection to: ${sseUrl}, attempt: ${reconnectAttempts + 1}`);
   statusMessage.value = 'Connecting to training server...';
 
   try {
-    websocket = new WebSocket(wsUrl);
+    eventSource = new EventSource(sseUrl);
 
-    websocket.onopen = () => {
-      console.log('WebSocket connected successfully');
+    eventSource.onopen = () => {
+      console.log('SSE connected successfully');
       statusMessage.value = 'Connected to training server';
-      error.value = ''; // Clear any previous errors
-      reconnectAttempts = 0; // 연결 성공 시 재연결 카운터 리셋
-
-      heartbeatTimer = setInterval(() => {
-        if (websocket && websocket.readyState === WebSocket.OPEN) {
-          websocket.send(JSON.stringify({ type: 'ping' }));
-        }
-      }, 30000);
+      error.value = '';
+      reconnectAttempts = 0;
     };
 
-    websocket.onmessage = (event) => {
+    // 학습 진행률 이벤트
+    eventSource.addEventListener('training_progress', (event) => {
       const data = JSON.parse(event.data);
-      console.log('WebSocket message received:', data);
-
-      if (data.type === 'pong') return;
+      console.log('Training progress received:', data);
 
       if (trainingJobId.value && data.jobId && data.jobId !== trainingJobId.value) {
-          console.log(`Ignoring message for different job: ${data.jobId} (current: ${trainingJobId.value})`);
-          return;
+        console.log(`Ignoring message for different job: ${data.jobId} (current: ${trainingJobId.value})`);
+        return;
       }
 
-      if (data.status === 'SUCCESS' || data.status === 'COMPLETED') {
-        isTraining.value = false;
-        statusMessage.value = '✅ Training completed successfully!';
-        emit('training-status-change', {
-          isTraining: false,
-          statusMessage: statusMessage.value,
-          currentEpoch: currentEpoch.value,
-          totalEpochs: totalEpochs.value
-        });
-        disconnectWebSocket();
-        emit('refresh-history');
-      } else if (data.status === 'FAILED' || data.status === 'FAIL') {
-        isTraining.value = false;
-        error.value = data.message || data.error || 'Training failed';
-        emit('training-status-change', {
-          isTraining: false,
-          statusMessage: '',
-          currentEpoch: 0,
-          totalEpochs: 0
-        });
-        disconnectWebSocket();
-        emit('refresh-history');
-      } else {
-        // 진행 상태에 따라 메시지 포맷팅
-        let formattedMessage = '';
+      // 진행 상태에 따라 메시지 포맷팅
+      let formattedMessage = '';
 
-        if (data.status === 'LOADING') {
-          formattedMessage = '🔄 Loading server...';
-        } else if (data.status === 'DOWNLOADING') {
-          formattedMessage = '⬇️ Downloading training images from S3...';
-        } else if (data.status === 'DOWNLOADING_COMPLETE') {
-          formattedMessage = `✅ Downloaded ${data.message?.match(/\d+/)?.[0] || ''} images`;
-        } else if (data.status === 'PREPROCESSING') {
-          formattedMessage = '🖼️ Processing images (captioning, cropping)...';
-        } else if (data.status === 'CAPTIONING_COMPLETE') {
-          formattedMessage = '✅ Image preprocessing complete';
-        } else if (data.status === 'TRAINING') {
-          // epoch 정보가 있으면 업데이트
-          if (data.currentEpoch !== null && data.currentEpoch !== undefined) {
-            currentEpoch.value = data.currentEpoch;
-            formattedMessage = `🚀 Training model... Epoch ${data.currentEpoch} / ${totalEpochs.value}`;
-            console.log(`Epoch updated: ${currentEpoch.value}/${totalEpochs.value}`);
-          } else {
-            formattedMessage = '🚀 Starting training pipeline...';
-          }
-        } else if (data.status === 'UPLOADING') {
-          formattedMessage = '⬆️ Uploading trained model to S3...';
+      if (data.status === 'LOADING') {
+        formattedMessage = '🔄 Loading server...';
+      } else if (data.status === 'DOWNLOADING') {
+        formattedMessage = '⬇️ Downloading training images from S3...';
+      } else if (data.status === 'DOWNLOADING_COMPLETE') {
+        formattedMessage = `✅ Downloaded ${data.message?.match(/\d+/)?.[0] || ''} images`;
+      } else if (data.status === 'PREPROCESSING') {
+        formattedMessage = '🖼️ Processing images (captioning, cropping)...';
+      } else if (data.status === 'CAPTIONING_COMPLETE') {
+        formattedMessage = '✅ Image preprocessing complete';
+      } else if (data.status === 'TRAINING') {
+        if (data.currentEpoch !== null && data.currentEpoch !== undefined) {
+          currentEpoch.value = data.currentEpoch;
+          formattedMessage = `🚀 Training model... Epoch ${data.currentEpoch} / ${totalEpochs.value}`;
+          console.log(`Epoch updated: ${currentEpoch.value}/${totalEpochs.value}`);
         } else {
-          formattedMessage = data.message || data.status;
+          formattedMessage = '🚀 Starting training pipeline...';
         }
-
-        statusMessage.value = formattedMessage;
-
-        emit('training-status-change', {
-          isTraining: true,
-          statusMessage: statusMessage.value,
-          currentEpoch: currentEpoch.value,
-          totalEpochs: totalEpochs.value
-        });
+      } else if (data.status === 'UPLOADING') {
+        formattedMessage = '⬆️ Uploading trained model to S3...';
+      } else {
+        formattedMessage = data.message || data.status;
       }
-    };
 
-    websocket.onerror = (event) => {
-      console.error('WebSocket error:', event);
-      console.error('WebSocket URL:', wsUrl);
-      // Don't show error immediately - wait for close event
-    };
+      statusMessage.value = formattedMessage;
 
-    websocket.onclose = (event) => {
-      console.log('WebSocket closed:', event.code, event.reason);
-      if (heartbeatTimer) clearInterval(heartbeatTimer);
+      emit('training-status-change', {
+        isTraining: true,
+        statusMessage: statusMessage.value,
+        currentEpoch: currentEpoch.value,
+        totalEpochs: totalEpochs.value
+      });
+    });
+
+    // 학습 완료 이벤트
+    eventSource.addEventListener('training_complete', (event) => {
+      const data = JSON.parse(event.data);
+      console.log('Training complete received:', data);
+
+      isTraining.value = false;
+      statusMessage.value = '✅ Training completed successfully!';
+      emit('training-status-change', {
+        isTraining: false,
+        statusMessage: statusMessage.value,
+        currentEpoch: currentEpoch.value,
+        totalEpochs: totalEpochs.value
+      });
+      disconnectSSE();
+      emit('refresh-history');
+    });
+
+    // 학습 실패 이벤트
+    eventSource.addEventListener('training_failed', (event) => {
+      const data = JSON.parse(event.data);
+      console.log('Training failed received:', data);
+
+      isTraining.value = false;
+      error.value = data.error || data.message || 'Training failed';
+      emit('training-status-change', {
+        isTraining: false,
+        statusMessage: '',
+        currentEpoch: 0,
+        totalEpochs: 0
+      });
+      disconnectSSE();
+      emit('refresh-history');
+    });
+
+    eventSource.onerror = (event) => {
+      console.error('SSE error:', event);
 
       if (isTraining.value && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
         reconnectAttempts++;
         console.log(`Training in progress, will reconnect in 5 seconds... (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
         statusMessage.value = `Reconnecting to training server... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`;
-        reconnectTimer = setTimeout(connectWebSocket, 5000);
+        eventSource?.close();
+        reconnectTimer = setTimeout(connectSSE, 5000);
       } else if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
         console.error('최대 재연결 시도 횟수 초과. 연결을 중단합니다.');
         error.value = '서버 연결이 불안정합니다. 학습 상태를 확인해주세요.';
         isTraining.value = false;
+        disconnectSSE();
       }
     };
   } catch (err) {
-    console.error('Failed to create WebSocket:', err);
+    console.error('Failed to create SSE:', err);
     error.value = `Failed to connect to training server: ${err instanceof Error ? err.message : 'Unknown error'}`;
 
     if (isTraining.value) {
-      // Retry connection
-      reconnectTimer = setTimeout(connectWebSocket, 5000);
+      reconnectTimer = setTimeout(connectSSE, 5000);
     }
   }
 };
 
-const disconnectWebSocket = () => {
+const disconnectSSE = () => {
   if (reconnectTimer) clearTimeout(reconnectTimer);
-  if (heartbeatTimer) clearInterval(heartbeatTimer);
-  if (websocket) {
-    websocket.close();
-    websocket = null;
+  if (eventSource) {
+    eventSource.close();
+    eventSource = null;
   }
   reconnectAttempts = 0; // 재연결 카운터 리셋
 };
@@ -399,7 +397,7 @@ const cancelTraining = async () => {
       currentEpoch: 0,
       totalEpochs: 0
     });
-    disconnectWebSocket();
+    disconnectSSE();
     emit('refresh-history');
   } catch (err) {
     console.error('Failed to cancel training:', err);
@@ -442,8 +440,8 @@ const checkActiveTraining = async () => {
         totalEpochs: totalEpochs.value
       });
 
-      // WebSocket 연결
-      connectWebSocket();
+      // SSE 연결
+      connectSSE();
     }
   } catch (err) {
     console.error('Failed to check active training:', err);
@@ -457,7 +455,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  disconnectWebSocket();
+  disconnectSSE();
 });
 </script>
 
