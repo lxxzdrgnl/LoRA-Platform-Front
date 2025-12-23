@@ -261,33 +261,38 @@ const handleOpenGenerate = (modelId: number) => {
       </div>
 
       <section class="models-grid">
-        <div v-if="loading" class="grid grid-cols-4 gap-lg">
+        <Transition name="fade" mode="out-in">
+        <div v-if="loading" key="loading" class="grid grid-cols-4 gap-lg">
           <div v-for="i in 8" :key="i" class="skeleton-card">
             <div class="skeleton" style="aspect-ratio: 4/3; border-radius: var(--radius-lg);"></div>
             <div class="skeleton mt-md" style="height: 24px; width: 80%;"></div>
             <div class="skeleton mt-sm" style="height: 16px; width: 60%;"></div>
           </div>
         </div>
-        <div v-else-if="models.length" class="models-grid-container">
-          <ModelCard
-            v-for="model in models"
-            :key="model.id"
-            :id="model.id"
-            :class="{ 'model-card-large': model.size === 'large' }"
-            :title="model.title"
-            :description="model.description"
-            :userNickname="model.userNickname"
-            :likeCount="model.likeCount"
-            :viewCount="model.viewCount"
-            :favoriteCount="model.favoriteCount"
-            :isLiked="model.isLiked"
-            :thumbnailUrl="model.thumbnailUrl"
-            @click="openModelDetailModal(model.id)"
-          />
+        <div v-else-if="models.length" key="models">
+          <TransitionGroup appear name="fade-slide" tag="div" class="models-grid-container">
+            <ModelCard
+              v-for="(model, index) in models"
+              :key="model.id"
+              :style="{ '--i': index }"
+              :id="model.id"
+              :class="{ 'model-card-large': model.size === 'large' }"
+              :title="model.title"
+              :description="model.description"
+              :userNickname="model.userNickname"
+              :likeCount="model.likeCount"
+              :viewCount="model.viewCount"
+              :favoriteCount="model.favoriteCount"
+              :isLiked="model.isLiked"
+              :thumbnailUrl="model.thumbnailUrl"
+              @click="openModelDetailModal(model.id)"
+            />
+          </TransitionGroup>
         </div>
-        <div v-else class="empty-state card text-center py-xl">
+        <div v-else key="empty" class="empty-state card text-center py-xl">
           <p class="text-secondary text-lg">No models found</p>
         </div>
+      </Transition>
       </section>
 
       <div v-if="totalPages > 1" class="pagination flex justify-center gap-sm mt-xl">
@@ -543,5 +548,38 @@ const handleOpenGenerate = (modelId: number) => {
     grid-column: span 1;
     grid-row: span 1;
   }
+}
+
+/* TransitionGroup animations */
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all 0.5s cubic-bezier(0.55, 0, 0.1, 1);
+  transition-delay: calc(0.02s * var(--i));
+}
+
+.fade-slide-enter-from,
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(15px);
+}
+
+/* Ensure leaving items are taken out of flow to prevent layout shifts */
+.fade-slide-leave-active {
+  position: absolute;
+}
+
+/* Smooth transitions for moving items */
+.fade-slide-move {
+  transition: transform 0.5s ease;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>
