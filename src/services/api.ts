@@ -267,7 +267,7 @@ const refreshAccessToken = async (): Promise<string> => {
     // Refresh token is invalid or expired
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
-    const frontendUrl = import.meta.env.VITE_FRONTEND_URL || 'https://d2f4r8lrfwl0ez.cloudfront.net';
+    const frontendUrl = import.meta.env.VITE_FRONTEND_URL;
     window.location.href = `${frontendUrl}/login`;
     throw new Error('Failed to refresh token');
   }
@@ -286,10 +286,10 @@ const authenticatedFetch = async (url: string, options: RequestInit = {}): Promi
   const makeRequest = async (token?: string): Promise<Response> => {
     const headers = token
       ? {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-          ...options.headers,
-        }
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        ...options.headers,
+      }
       : getAuthHeaders();
 
     return fetch(url, {
@@ -876,11 +876,11 @@ export const api = {
     },
 
     async deleteHistory(historyId: number): Promise<ApiResponse<void>> {
-        const response = await authenticatedFetch(`${API_BASE_URL}/api/generate/history/${historyId}`, {
-            method: 'DELETE',
-            headers: getAuthHeaders(),
-        });
-        return handleResponse(response);
+      const response = await authenticatedFetch(`${API_BASE_URL}/api/generate/history/${historyId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      return handleResponse(response);
     },
 
     streamGenerationProgress(onMessage: (data: GenerationProgressResponse) => void): EventSource {

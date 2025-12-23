@@ -42,7 +42,7 @@ export const useAuthStore = defineStore('auth', () => {
   function requireAuth(): boolean {
     if (!isAuthenticated.value) {
       alert('Login to continue');
-      const frontendUrl = import.meta.env.VITE_FRONTEND_URL || 'http://blueming-front.s3-website.ap-northeast-2.amazonaws.com';
+      const frontendUrl = import.meta.env.VITE_FRONTEND_URL;
       window.location.href = `${frontendUrl}/login`;
       return false;
     }
