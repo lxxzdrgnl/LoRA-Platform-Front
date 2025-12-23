@@ -352,9 +352,14 @@ const connectSSE = () => {
   }
 
   const apiBase = (import.meta.env.VITE_API_BASE_URL || 'http://blueming-ai-env-1-env.eba-fdwcr2jd.ap-northeast-2.elasticbeanstalk.com').trim().replace(/\/+$/, '');
-  const sseUrl = `${apiBase}/api/generate/stream`;
 
-  console.log(`🔌 SSE 연결 시도: ${sseUrl}`);
+  // JWT 토큰을 URL 파라미터로 추가 (EventSource는 헤더를 지원하지 않음)
+  const token = localStorage.getItem('accessToken');
+  const sseUrl = token
+    ? `${apiBase}/api/generate/stream?token=${encodeURIComponent(token)}`
+    : `${apiBase}/api/generate/stream`;
+
+  console.log(`🔌 SSE 연결 시도: ${sseUrl.replace(/token=[^&]+/, 'token=***')}`);
   statusMessage.value = '모델 불러오는 중...';
 
   try {
