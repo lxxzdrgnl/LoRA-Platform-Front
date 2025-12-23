@@ -121,8 +121,11 @@ const toggleLike = async () => {
   try {
     await api.community.toggleLike(props.modelId);
     model.value.isLiked = !model.value.isLiked;
-    model.value.likeCount += model.value.isLiked ? 1 : -1;
-    emit('model-update');
+    emit('model-update', { 
+      id: props.modelId, 
+      isLiked: model.value.isLiked, 
+      likeCount: model.value.likeCount 
+    });
   } catch (err) {
     console.error('Failed to toggle like:', err);
   }

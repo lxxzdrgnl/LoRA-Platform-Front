@@ -25,6 +25,23 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null;
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
+
+    // Attempt to clear any session cookies
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const rawCookie = cookies[i];
+      if (!rawCookie) continue; // Skip if rawCookie is empty or undefined
+
+      const cookie = rawCookie.trim();
+      if (!cookie) continue; // Skip if cookie is empty after trimming
+
+      const eqPos = cookie.indexOf('=');
+      const name = eqPos > -1 ? cookie.substring(0, eqPos) : cookie;
+      
+      if (!name) continue; // Skip if name is empty
+
+      document.cookie = name.trim() + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
+    }
   }
 
   function setUser(userData: UserResponse) {
