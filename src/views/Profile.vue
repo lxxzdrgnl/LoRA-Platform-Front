@@ -126,6 +126,13 @@ const handleDownloadImage = async (event: Event, imageUrl: string, historyId: nu
   await downloadImage(imageUrl, historyId);
 };
 
+// Training deleted handler
+const handleTrainingDeleted = async (jobId: number) => {
+  console.log('Training job deleted:', jobId);
+  // Reload training history
+  await loadTrainingHistory();
+};
+
 // Filter change handler
 const handleFilterChange = async (modelId: number | null) => {
   await loadGenerationHistory(0, 20, false, modelId ?? undefined);
@@ -210,6 +217,7 @@ const handleLoadMore = async (modelId: number | null) => {
           @download-image="handleDownloadImage"
           @load-more="handleLoadMore"
           @filter-change="handleFilterChange"
+          @training-deleted="handleTrainingDeleted"
         />
       </div>
     </div>

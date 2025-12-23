@@ -92,13 +92,20 @@ watch(() => props.show, (isShown) => {
 const connectSSE = () => {
   if (eventSource) eventSource.close();
 
-  // SSE 연결 (JWT 토큰 자동 포함 - 쿠키 또는 withCredentials)
-  const sseUrl = `${import.meta.env.VITE_API_BASE_URL || ''}/api/training/stream`;
+  // SSE 연결 (JWT 토큰 URL 파라미터로 전달)
+  const token = localStorage.getItem('accessToken');
+  if (!token) {
+    console.error('Detail Modal: No access token found');
+    return;
+  }
+
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+  const sseUrl = `${baseUrl}/api/training/stream?token=${token}`;
 
   console.log(`Detail Modal: Connecting SSE to: ${sseUrl}`);
 
   try {
-    eventSource = new EventSource(sseUrl, { withCredentials: true });
+    eventSource = new EventSource(sseUrl);
 
     eventSource.onopen = () => {
       console.log('Detail Modal: SSE connected successfully');

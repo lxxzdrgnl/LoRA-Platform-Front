@@ -8,7 +8,12 @@ interface Props {
   loading?: boolean;
 }
 
+interface Emits {
+  (e: 'deleted', jobId: number): void;
+}
+
 defineProps<Props>();
+const emit = defineEmits<Emits>();
 
 const showModal = ref(false);
 const selectedJob = ref<TrainingJobWithModelResponse | null>(null);
@@ -26,7 +31,7 @@ const closeModal = () => {
 const handleDeleted = (jobId: number) => {
   closeModal();
   // Emit event to parent to refresh the list
-  window.location.reload(); // Simple reload for now
+  emit('deleted', jobId);
 };
 </script>
 

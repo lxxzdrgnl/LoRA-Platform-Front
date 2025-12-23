@@ -787,10 +787,9 @@ export const api = {
     },
 
     async deleteTrainingJob(jobId: number): Promise<ApiResponse<void>> {
-      const response = await authenticatedFetch(`${API_BASE_URL}/api/training/jobs/${jobId}/fail`, {
-        method: 'POST',
+      const response = await authenticatedFetch(`${API_BASE_URL}/api/training/jobs/${jobId}`, {
+        method: 'DELETE',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ error: 'User cancelled' }),
       });
       return handleResponse(response);
     },

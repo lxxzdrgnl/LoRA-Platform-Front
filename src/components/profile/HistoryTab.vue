@@ -17,6 +17,7 @@ interface Emits {
   (e: 'downloadImage', event: Event, imageUrl: string, historyId: number): void;
   (e: 'loadMore', modelId: number | null): void;
   (e: 'filterChange', modelId: number | null): void;
+  (e: 'trainingDeleted', jobId: number): void;
 }
 
 defineProps<Props>();
@@ -40,6 +41,10 @@ const loadMore = () => {
 const handleFilterChange = (modelId: number | null) => {
   currentFilterModelId.value = modelId;
   emit('filterChange', modelId);
+};
+
+const handleTrainingDeleted = (jobId: number) => {
+  emit('trainingDeleted', jobId);
 };
 </script>
 
@@ -81,6 +86,7 @@ const handleFilterChange = (modelId: number | null) => {
       v-if="historySubTab === 'training'"
       :history="trainingHistory"
       :loading="loading"
+      @deleted="handleTrainingDeleted"
     />
   </div>
 </template>
