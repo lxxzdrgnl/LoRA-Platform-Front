@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { api } from '../services/api';
 import { useAuthStore } from '../stores/auth';
@@ -11,12 +11,23 @@ const authStore = useAuthStore();
 
 const email = ref('');
 const password = ref('');
+const confirmPassword = ref('');
 const isLoading = ref(false);
 const errorMessage = ref('');
 
-const handleLogin = async () => {
-  if (!email.value || !password.value) {
-    errorMessage.value = 'Email and password are required';
+const handleRegister = async () => {
+  if (!email.value || !password.value || !confirmPassword.value) {
+    errorMessage.value = 'All fields are required';
+    return;
+  }
+
+  if (password.value.length < 6) {
+    errorMessage.value = 'Password must be at least 6 characters';
+    return;
+  }
+
+  if (password.value !== confirmPassword.value) {
+    errorMessage.value = 'Passwords do not match';
     return;
   }
 
@@ -24,8 +35,8 @@ const handleLogin = async () => {
   errorMessage.value = '';
 
   try {
-    // Firebase 로그인
-    const userCredential = await signInWithEmailAndPassword(auth, email.value, password.value);
+    // Firebase 회원가입
+    const userCredential = await createUserWithEmailAndPassword(auth, email.value, password.value);
 
     // ID Token 획득
     const idToken = await userCredential.user.getIdToken();
@@ -41,33 +52,37 @@ const handleLogin = async () => {
     // 홈으로 리다이렉트
     router.push('/');
   } catch (error: any) {
-    console.error('Login error:', error);
-    if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
-      errorMessage.value = 'Invalid email or password';
-    } else if (error.code === 'auth/too-many-requests') {
-      errorMessage.value = 'Too many failed login attempts. Please try again later.';
+    console.error('Registration error:', error);
+    if (error.code === 'auth/email-already-in-use') {
+      errorMessage.value = 'This email is already registered';
+    } else if (error.code === 'auth/invalid-email') {
+      errorMessage.value = 'Invalid email address';
+    } else if (error.code === 'auth/weak-password') {
+      errorMessage.value = 'Password is too weak';
+    } else if (error.message?.includes('EMAIL_ALREADY_EXISTS')) {
+      errorMessage.value = 'This email is already registered with another login method (Google)';
     } else {
-      errorMessage.value = error.message || 'Login failed';
+      errorMessage.value = error.message || 'Registration failed';
     }
   } finally {
     isLoading.value = false;
   }
 };
 
-const handleGoogleLogin = () => {
+const handleGoogleSignup = () => {
   // 기존 OAuth2 방식 사용 (Spring Security가 처리)
   api.auth.googleLogin();
 };
 </script>
 
 <template>
-  <div class="login-page">
-    <div class="login-container">
-      <div class="login-card card">
+  <div class="register-page">
+    <div class="register-container">
+      <div class="register-card card">
         <!-- Logo -->
         <div class="text-center mb-xl">
           <h1 class="text-4xl font-bold gradient-text mb-md">Blueming AI</h1>
-          <p class="text-lg text-secondary">Sign in to continue</p>
+          <p class="text-lg text-secondary">Create your account</p>
         </div>
 
         <!-- Error Message -->
@@ -75,8 +90,8 @@ const handleGoogleLogin = () => {
           {{ errorMessage }}
         </div>
 
-        <!-- Login Form -->
-        <form @submit.prevent="handleLogin" class="login-form">
+        <!-- Register Form -->
+        <form @submit.prevent="handleRegister" class="register-form">
           <div class="form-group">
             <label class="label">Email</label>
             <input
@@ -94,7 +109,19 @@ const handleGoogleLogin = () => {
             <input
               type="password"
               v-model="password"
-              placeholder="Enter your password"
+              placeholder="Minimum 6 characters"
+              class="input"
+              :disabled="isLoading"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="label">Confirm Password</label>
+            <input
+              type="password"
+              v-model="confirmPassword"
+              placeholder="Confirm your password"
               class="input"
               :disabled="isLoading"
               required
@@ -102,16 +129,10 @@ const handleGoogleLogin = () => {
           </div>
 
           <button type="submit" class="btn btn-primary w-full" :disabled="isLoading">
-            <span v-if="isLoading">Logging in...</span>
-            <span v-else>Login</span>
+            <span v-if="isLoading">Creating Account...</span>
+            <span v-else>Sign Up</span>
           </button>
         </form>
-
-        <!-- Sign Up Link -->
-        <p class="text-center mt-md text-secondary">
-          Don't have an account?
-          <router-link to="/register" class="text-primary font-semibold">Sign up</router-link>
-        </p>
 
         <!-- Divider -->
         <div class="divider-container">
@@ -120,56 +141,29 @@ const handleGoogleLogin = () => {
           <div class="divider-line"></div>
         </div>
 
-        <!-- Google Login -->
-        <button class="btn-google" @click="handleGoogleLogin" :disabled="isLoading">
+        <!-- Google Sign Up -->
+        <button class="btn-google" @click="handleGoogleSignup" :disabled="isLoading">
           <svg width="20" height="20" viewBox="0 0 24 24">
             <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
             <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
             <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
             <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
           </svg>
-          Continue with Google
+          Sign up with Google
         </button>
-      </div>
 
-      <!-- Features -->
-      <div class="features grid grid-cols-3 gap-lg mt-xl">
-        <div class="feature-card card-sm text-center">
-          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mx-auto mb-md">
-            <path d="M12 20h9"></path>
-            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-          </svg>
-          <h3 class="font-semibold mb-xs">Create Models</h3>
-          <p class="text-sm text-secondary">Train your own LoRA models</p>
-        </div>
-
-        <div class="feature-card card-sm text-center">
-          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mx-auto mb-md">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-            <circle cx="8.5" cy="8.5" r="1.5"></circle>
-            <polyline points="21 15 16 10 5 21"></polyline>
-          </svg>
-          <h3 class="font-semibold mb-xs">Generate Images</h3>
-          <p class="text-sm text-secondary">Create amazing artwork</p>
-        </div>
-
-        <div class="feature-card card-sm text-center">
-          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mx-auto mb-md">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-            <circle cx="9" cy="7" r="4"></circle>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-          </svg>
-          <h3 class="font-semibold mb-xs">Join Community</h3>
-          <p class="text-sm text-secondary">Share with creators</p>
-        </div>
+        <!-- Login Link -->
+        <p class="text-center mt-lg text-secondary">
+          Already have an account?
+          <router-link to="/login" class="text-primary font-semibold">Log in</router-link>
+        </p>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.login-page {
+.register-page {
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -178,17 +172,17 @@ const handleGoogleLogin = () => {
   background: var(--bg-dark);
 }
 
-.login-container {
+.register-container {
   width: 100%;
   max-width: 480px;
 }
 
-.login-card {
+.register-card {
   padding: var(--space-2xl);
 }
 
-.login-form {
-  margin-bottom: var(--space-md);
+.register-form {
+  margin-bottom: var(--space-lg);
 }
 
 .error-message {
@@ -246,17 +240,9 @@ const handleGoogleLogin = () => {
   cursor: not-allowed;
 }
 
-.features {
-  margin-top: var(--space-2xl);
-}
-
 @media (max-width: 768px) {
-  .login-card {
+  .register-card {
     padding: var(--space-xl);
-  }
-
-  .features {
-    grid-template-columns: 1fr;
   }
 }
 </style>

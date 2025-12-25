@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, onUnmounted } from 'vue';
 import JSZip from 'jszip';
 import { api } from '../../services/api';
 
@@ -15,9 +15,32 @@ const error = ref('');
 const history = ref<any>(null);
 const isZipping = ref(false);
 
+// SSE 관련
+let eventSource: EventSource | null = null;
+const currentStep = ref(0);
+const totalSteps = ref(0);
+const statusMessage = ref('');
+
+// 모달이 열릴 때/닫힐 때 처리
+watch(() => props.show, (newVal) => {
+  if (!newVal) {
+    // 모달이 닫힐 때 SSE 종료
+    disconnectSSE();
+  }
+});
+
 watch(() => props.historyId, async (newId) => {
   if (newId) {
+    // SSE 먼저 종료
+    disconnectSSE();
+
+    // 히스토리 상세 가져오기
     await fetchHistoryDetails(newId);
+
+    // 진행 중이면 SSE 연결
+    if (history.value && ['PENDING', 'GENERATING'].includes(history.value.status)) {
+      connectSSE(newId);
+    }
   }
 });
 
@@ -27,6 +50,15 @@ const fetchHistoryDetails = async (id: number) => {
     error.value = '';
     const response = await api.generate.getHistoryDetail(id);
     history.value = response.data;
+
+    // 진행률 초기화
+    if (history.value.status === 'GENERATING') {
+      currentStep.value = history.value.currentStep || 0;
+      totalSteps.value = history.value.totalSteps || 0;
+      statusMessage.value = history.value.currentStep
+        ? `Generating... (${history.value.currentStep}/${history.value.totalSteps})`
+        : '모델 불러오는 중...';
+    }
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to load history details.';
   } finally {
@@ -87,7 +119,7 @@ const downloadAllAsZip = async () => {
     isZipping.value = true;
     try {
         const zip = new JSZip();
-        
+
         const imagePromises = history.value.generatedImages.map(async (image: any, index: number) => {
             const freshUrl = `${image.s3Url}?time=${new Date().getTime()}`;
             const response = await fetch(freshUrl, {
@@ -106,7 +138,7 @@ const downloadAllAsZip = async () => {
         await Promise.all(imagePromises);
 
         const zipBlob = await zip.generateAsync({ type: 'blob' });
-        
+
         const link = document.createElement('a');
         link.href = URL.createObjectURL(zipBlob);
         link.download = `blueming_ai_history_${history.value.id}.zip`;
@@ -122,6 +154,110 @@ const downloadAllAsZip = async () => {
         isZipping.value = false;
     }
 };
+
+// SSE 연결
+const connectSSE = (historyId: number) => {
+  if (eventSource) {
+    eventSource.close();
+  }
+
+  const apiBase = (import.meta.env.VITE_API_BASE_URL || 'http://blueming-ai-env-1-env.eba-fdwcr2jd.ap-northeast-2.elasticbeanstalk.com').trim().replace(/\/+$/, '');
+
+  // JWT 토큰을 URL 파라미터로 추가
+  const token = localStorage.getItem('accessToken');
+  const sseUrl = token
+    ? `${apiBase}/api/generate/stream?token=${encodeURIComponent(token)}`
+    : `${apiBase}/api/generate/stream`;
+
+  console.log(`🔌 SSE 연결 시도 (History Detail): historyId=${historyId}`);
+
+  try {
+    eventSource = new EventSource(sseUrl, { withCredentials: true });
+
+    eventSource.onopen = () => {
+      console.log('✅ SSE 연결 성공 (History Detail)');
+    };
+
+    // 연결 성공 이벤트
+    eventSource.addEventListener('connected', (event) => {
+      console.log('✅ SSE connection confirmed (History Detail):', event.data);
+    });
+
+    // 이미지 생성 진행률 이벤트
+    eventSource.addEventListener('generation_progress', (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('📦 SSE 진행률 (History Detail):', data);
+
+        // historyId 필터링 (내 작업만 처리)
+        if (data.historyId !== historyId) {
+          console.log('⏭️ 다른 작업의 이벤트 무시:', data.historyId);
+          return;
+        }
+
+        if (data.status === 'SUCCESS') {
+          console.log('✅ 생성 완료! (History Detail)', data);
+          statusMessage.value = 'Generation completed!';
+
+          // 히스토리 새로고침
+          fetchHistoryDetails(historyId);
+
+          disconnectSSE();
+        } else if (data.status === 'FAILED') {
+          console.error('❌ 생성 실패 (History Detail):', data.message);
+          statusMessage.value = data.message || 'Generation failed';
+
+          // 히스토리 새로고침
+          fetchHistoryDetails(historyId);
+
+          disconnectSSE();
+        } else if (data.status === 'GENERATING') {
+          // 진행률 업데이트
+          if (data.currentStep !== undefined && data.totalSteps !== undefined) {
+            if (!currentStep.value || data.currentStep >= currentStep.value) {
+              currentStep.value = data.currentStep;
+              totalSteps.value = data.totalSteps;
+              statusMessage.value = `Generating... (${data.currentStep}/${data.totalSteps})`;
+
+              // history.value 실시간 업데이트
+              if (history.value) {
+                history.value.currentStep = data.currentStep;
+                history.value.totalSteps = data.totalSteps;
+              }
+
+              console.log(`📊 진행률 (History Detail): ${data.currentStep}/${data.totalSteps}`);
+            }
+          } else {
+            statusMessage.value = 'Generating...';
+          }
+        }
+      } catch (err) {
+        console.error('❌ SSE 메시지 파싱 실패 (History Detail):', err, event.data);
+      }
+    });
+
+    eventSource.onerror = (event) => {
+      console.error('❌ SSE 에러 (History Detail):', event);
+      // SSE는 자동 재연결 - 에러 로그만 출력
+    };
+
+  } catch (err) {
+    console.error('❌ SSE 생성 실패 (History Detail):', err);
+  }
+};
+
+const disconnectSSE = () => {
+  if (eventSource) {
+    eventSource.close();
+    eventSource = null;
+    console.log('⏹️ SSE 종료 (History Detail)');
+  }
+};
+
+onUnmounted(() => {
+  // 컴포넌트 언마운트 시 SSE 종료
+  disconnectSSE();
+});
 </script>
 
 <template>

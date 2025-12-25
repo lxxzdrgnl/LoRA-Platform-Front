@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { api, type UserResponse } from '../services/api';
@@ -8,11 +8,18 @@ import ThemeToggle from './ThemeToggle.vue';
 const router = useRouter();
 const authStore = useAuthStore();
 
-const user = ref<UserResponse | null>(authStore.user);
+const user = computed(() => authStore.user);
 const showUserMenu = ref(false);
 const showMobileMenu = ref(false);
 
 const isLoggedIn = computed(() => authStore.isAuthenticated);
+
+// Watch for authentication changes
+watch(() => authStore.isAuthenticated, async (newValue) => {
+  if (newValue && !authStore.user) {
+    await checkAuthStatus();
+  }
+});
 
 onMounted(async () => {
   await checkAuthStatus();
@@ -37,17 +44,15 @@ const checkAuthStatus = async () => {
 
   // Use cached user from store if available
   if (authStore.user) {
-    user.value = authStore.user;
-    console.log('Navigation - using cached user:', user.value.nickname);
+    console.log('Navigation - using cached user:', authStore.user.nickname);
     return;
   }
 
   try {
     console.log('Navigation - fetching user profile');
     const response = await api.user.getMyProfile();
-    user.value = response.data;
     authStore.setUser(response.data);
-    console.log('Navigation - user profile loaded:', user.value.nickname);
+    console.log('Navigation - user profile loaded:', response.data.nickname);
   } catch (error) {
     console.error('Navigation - failed to get user profile:', error);
     // Token might be expired, clear it
@@ -68,9 +73,8 @@ const handleClickOutside = (event: MouseEvent) => {
 const handleProfileUpdate = (event: Event) => {
   const customEvent = event as CustomEvent;
   if (customEvent.detail) {
-    user.value = customEvent.detail;
     authStore.setUser(customEvent.detail);
-    console.log('Navigation - profile updated:', user.value?.nickname);
+    console.log('Navigation - profile updated:', customEvent.detail.nickname);
   }
 };
 
@@ -83,7 +87,7 @@ const toggleMobileMenu = () => {
 };
 
 const handleLogin = () => {
-  api.auth.googleLogin();
+  router.push('/login');
 };
 
 const handleLogout = async () => {
@@ -97,7 +101,6 @@ const handleLogout = async () => {
   }
 
   authStore.clearTokens();
-  user.value = null;
   showUserMenu.value = false;
   window.location.href = '/';
 };
@@ -161,7 +164,7 @@ const handleLogout = async () => {
           </template>
 
           <template v-else>
-            <button @click="handleLogin" class="btn btn-primary btn-sm desktop-login">Login with Google</button>
+            <button @click="handleLogin" class="btn btn-primary btn-sm desktop-login">Login</button>
           </template>
 
           <!-- Mobile Menu Button -->
@@ -195,7 +198,7 @@ const handleLogout = async () => {
         </template>
         <template v-else>
           <button @click="handleLogin" class="btn btn-primary w-full">
-            Login with Google
+            Login
           </button>
           <div class="divider"></div>
         </template>

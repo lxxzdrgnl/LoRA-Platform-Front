@@ -6,13 +6,15 @@ interface Props {
   userNickname: string;
   likeCount: number;
   viewCount: number;
-  favoriteCount: number;
+  favoriteCount?: number;
   isLiked?: boolean;
   thumbnailUrl?: string;
   tags?: Array<{ id: number; name: string }>;
 }
 
-defineProps<Props>();
+withDefaults(defineProps<Props>(), {
+  favoriteCount: 0,
+});
 defineEmits(['click']);
 </script>
 
