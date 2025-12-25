@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import ModelList from '../views/ModelList.vue';
 import Login from '../views/Login.vue';
+import Register from '../views/Register.vue';
 import AuthCallback from '../views/AuthCallback.vue';
 import Profile from '../views/Profile.vue';
 import Search from '../views/Search.vue';
@@ -34,6 +35,11 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: Login,
+    },
+    {
+      path: '/register',
+      name: 'register',
+      component: Register,
     },
     {
       path: '/auth/callback',
@@ -84,8 +90,8 @@ router.beforeEach((to, from, next) => {
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
   const isAuthenticated = authStore.isAuthenticated;
 
-  if (to.name === 'login' && isAuthenticated) {
-    // If authenticated user tries to access /login, redirect to home
+  if ((to.name === 'login' || to.name === 'register') && isAuthenticated) {
+    // If authenticated user tries to access /login or /register, redirect to home
     next({ name: 'home' });
   } else if (requiresAuth && !isAuthenticated) {
     // If route requires auth and user is not authenticated, redirect to login

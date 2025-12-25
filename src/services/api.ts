@@ -344,6 +344,22 @@ export const api = {
       window.location.href = `${API_BASE_URL}/api/auth/google?prompt=select_account`;
     },
 
+    async firebaseLogin(idToken: string): Promise<ApiResponse<{
+      accessToken: string;
+      refreshToken: string;
+      userId: number;
+      email: string;
+      nickname: string;
+      profileImageUrl: string;
+    }>> {
+      const response = await fetch(`${API_BASE_URL}/api/auth/firebase`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      });
+      return handleResponse(response);
+    },
+
     async getCurrentUser(): Promise<ApiResponse<Record<string, unknown>>> {
       const response = await authenticatedFetch(`${API_BASE_URL}/api/auth/me`, {
         headers: getAuthHeaders(),
