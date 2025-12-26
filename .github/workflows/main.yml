@@ -52,8 +52,8 @@ jobs:
       - name: Build for JCloud
         run: npm run build
         env:
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
-          VITE_FRONTEND_URL: https://113.198.66.75:17196
+          VITE_API_BASE_URL: http://113.198.66.68:18232
+          VITE_FRONTEND_URL: http://113.198.66.75:18196
 
       - name: Upload JCloud build artifacts
         uses: actions/upload-artifact@v4
