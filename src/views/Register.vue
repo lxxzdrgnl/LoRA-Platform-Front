@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, fetchSignInMethodsForEmail } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { api } from '../services/api';
 import { useAuthStore } from '../stores/auth';
@@ -14,10 +14,75 @@ const password = ref('');
 const confirmPassword = ref('');
 const isLoading = ref(false);
 const errorMessage = ref('');
+const isEmailChecked = ref(false);
+const isCheckingEmail = ref(false);
+const emailCheckMessage = ref('');
+const passwordError = ref('');
+
+// 이메일이 변경되면 중복 확인 초기화
+watch(email, () => {
+  isEmailChecked.value = false;
+  emailCheckMessage.value = '';
+  errorMessage.value = '';
+});
+
+// Real-time password match validation
+watch([password, confirmPassword], () => {
+  if (confirmPassword.value && password.value !== confirmPassword.value) {
+    passwordError.value = 'Passwords do not match';
+  } else {
+    passwordError.value = '';
+  }
+});
+
+// Email duplicate check
+const checkEmailDuplicate = async () => {
+  if (!email.value) {
+    emailCheckMessage.value = 'Please enter your email';
+    return;
+  }
+
+  // Email format validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email.value)) {
+    emailCheckMessage.value = 'Invalid email format';
+    return;
+  }
+
+  isCheckingEmail.value = true;
+  emailCheckMessage.value = '';
+
+  try {
+    const signInMethods = await fetchSignInMethodsForEmail(auth, email.value);
+
+    if (signInMethods.length > 0) {
+      emailCheckMessage.value = 'This email is already in use';
+      isEmailChecked.value = false;
+    } else {
+      emailCheckMessage.value = 'This email is available';
+      isEmailChecked.value = true;
+    }
+  } catch (error: any) {
+    console.error('Email check error:', error);
+    if (error.code === 'auth/invalid-email') {
+      emailCheckMessage.value = 'Invalid email format';
+    } else {
+      emailCheckMessage.value = 'Error checking email availability';
+    }
+    isEmailChecked.value = false;
+  } finally {
+    isCheckingEmail.value = false;
+  }
+};
 
 const handleRegister = async () => {
   if (!email.value || !password.value || !confirmPassword.value) {
     errorMessage.value = 'All fields are required';
+    return;
+  }
+
+  if (!isEmailChecked.value) {
+    errorMessage.value = 'Please check email availability first';
     return;
   }
 
@@ -94,14 +159,30 @@ const handleGoogleSignup = () => {
         <form @submit.prevent="handleRegister" class="register-form">
           <div class="form-group">
             <label class="label">Email</label>
-            <input
-              type="email"
-              v-model="email"
-              placeholder="your@email.com"
-              class="input"
-              :disabled="isLoading"
-              required
-            />
+            <div class="email-check-container">
+              <input
+                type="email"
+                v-model="email"
+                placeholder="your@email.com"
+                class="input email-input"
+                :disabled="isLoading"
+                required
+              />
+              <button
+                type="button"
+                @click="checkEmailDuplicate"
+                class="btn-check-email"
+                :disabled="isLoading || isCheckingEmail || !email"
+              >
+                <span v-if="isCheckingEmail">Checking...</span>
+                <span v-else>Check</span>
+              </button>
+            </div>
+            <div v-if="emailCheckMessage"
+                 class="email-check-message"
+                 :class="{ 'success': isEmailChecked, 'error': !isEmailChecked && emailCheckMessage }">
+              {{ emailCheckMessage }}
+            </div>
           </div>
 
           <div class="form-group">
@@ -126,9 +207,12 @@ const handleGoogleSignup = () => {
               :disabled="isLoading"
               required
             />
+            <div v-if="passwordError" class="password-error-message">
+              {{ passwordError }}
+            </div>
           </div>
 
-          <button type="submit" class="btn btn-primary w-full" :disabled="isLoading">
+          <button type="submit" class="btn btn-primary w-full" :disabled="isLoading || !isEmailChecked">
             <span v-if="isLoading">Creating Account...</span>
             <span v-else>Sign Up</span>
           </button>
@@ -193,6 +277,68 @@ const handleGoogleSignup = () => {
   color: var(--error);
   font-size: 14px;
   text-align: center;
+}
+
+.email-check-container {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.email-input {
+  flex: 1;
+}
+
+.btn-check-email {
+  padding: 12px 20px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.btn-check-email:hover:not(:disabled) {
+  background: var(--primary-dark);
+  transform: translateY(-1px);
+}
+
+.btn-check-email:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.email-check-message {
+  margin-top: var(--space-sm);
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+}
+
+.email-check-message.success {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid #22c55e;
+}
+
+.email-check-message.error {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--error);
+  border: 1px solid var(--error);
+}
+
+.password-error-message {
+  margin-top: var(--space-sm);
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--error);
+  border: 1px solid var(--error);
 }
 
 .divider-container {

@@ -1,4 +1,4 @@
-name: Deploy Vue Frontend to CloudFront
+name: Deploy Vue Frontend to AWS & JCloud
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  deploy:
+  build-aws:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,17 +21,57 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Debug API Base URL
-        run: echo "VITE_API_BASE_URL is ${{ secrets.VITE_API_BASE_URL }}"
-
-      - name: Show api.ts content
-        run: cat src/services/api.ts
-
-      - name: Build
+      - name: Build for AWS CloudFront
         run: npm run build
         env:
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
           VITE_FRONTEND_URL: ${{ secrets.VITE_FRONTEND_URL }}
+
+      - name: Upload AWS build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-aws
+          path: dist/
+          retention-days: 1
+
+  build-jcloud:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build for JCloud
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          VITE_FRONTEND_URL: https://113.198.66.75:17196
+
+      - name: Upload JCloud build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-jcloud
+          path: dist/
+          retention-days: 1
+
+  deploy-aws:
+    needs: build-aws
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-aws
+          path: dist
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -48,3 +88,113 @@ jobs:
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
             --paths "/*"
+
+  deploy-jcloud:
+    needs: build-jcloud
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-jcloud
+          path: dist
+
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.JCLOUD_SSH_KEY }}" > ~/.ssh/jcloud_key.pem
+          chmod 600 ~/.ssh/jcloud_key.pem
+
+          # SSH 키 파일 확인
+          echo "SSH key file created:"
+          ls -la ~/.ssh/jcloud_key.pem
+          echo "First line of SSH key:"
+          head -n 1 ~/.ssh/jcloud_key.pem
+
+          # SSH 연결 테스트 (타임아웃 10초)
+          echo "Testing SSH connection..."
+          ssh-keyscan -p 19196 -T 10 113.198.66.75 >> ~/.ssh/known_hosts 2>&1 || echo "Warning: ssh-keyscan failed, continuing anyway"
+
+          # 실제 SSH 연결 테스트
+          ssh -i ~/.ssh/jcloud_key.pem -p 19196 -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@113.198.66.75 "echo 'SSH connection successful'" || {
+            echo "SSH connection failed. Check your SSH key and server accessibility."
+            exit 1
+          }
+
+      - name: Deploy to JCloud via SCP
+        run: |
+          scp -i ~/.ssh/jcloud_key.pem -P 19196 -o StrictHostKeyChecking=no -r dist/* ubuntu@113.198.66.75:~/dist/
+
+      - name: Setup Nginx with HTTPS on JCloud
+        run: |
+          ssh -i ~/.ssh/jcloud_key.pem -p 19196 -o StrictHostKeyChecking=no ubuntu@113.198.66.75 << 'EOF'
+            # Nginx가 설치되어 있지 않으면 설치
+            if ! command -v nginx &> /dev/null; then
+              sudo apt-get update
+              sudo apt-get install -y nginx
+            fi
+
+            # 자체 서명 SSL 인증서 생성 (이미 있으면 스킵)
+            if [ ! -f /etc/nginx/ssl/nginx.crt ]; then
+              sudo mkdir -p /etc/nginx/ssl
+              sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+                -keyout /etc/nginx/ssl/nginx.key \
+                -out /etc/nginx/ssl/nginx.crt \
+                -subj "/C=KR/ST=Seoul/L=Seoul/O=LoRA/CN=113.198.66.75"
+            fi
+
+            # dist 디렉토리를 nginx 서빙 디렉토리로 복사
+            sudo rm -rf /var/www/html/*
+            sudo cp -r ~/dist/* /var/www/html/
+
+            # Nginx 설정 파일 생성 (HTTPS)
+            cat > /tmp/nginx_config << 'NGINX_CONFIG'
+server {
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+
+    ssl_certificate /etc/nginx/ssl/nginx.crt;
+    ssl_certificate_key /etc/nginx/ssl/nginx.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    root /var/www/html;
+    index index.html;
+
+    server_name _;
+
+    location / {
+        try_files \$uri \$uri/ /index.html;
+    }
+
+    location /api {
+        proxy_pass http://localhost:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    return 301 https://\$host\$request_uri;
+}
+NGINX_CONFIG
+
+            sudo mv /tmp/nginx_config /etc/nginx/sites-available/default
+
+            # Nginx 설정 테스트 및 재시작
+            sudo nginx -t && sudo systemctl restart nginx
+            sudo systemctl enable nginx
+
+            echo "HTTPS deployment completed! Access via: https://113.198.66.75:17196"
+          EOF
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.ssh/jcloud_key.pem

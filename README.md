@@ -30,12 +30,19 @@
 
 ---
 
-### 주요 링크
-- **프론트엔드 배포 링크**: http://blueming-front.s3-website.ap-northeast-2.amazonaws.com/
-- **백엔드 API 기본 URL**: http://blueming-ai-env.eba-gdfew9bx.ap-northeast-2.elasticbeanstalk.com/
-- **백엔드 API 문서 (Swagger UI)**: http://bluemingai.ap-northeast-2.elasticbeanstalk.com/swagger-ui/index.html
-- **백엔드 Github**: https://github.com/lxxzdrgnl/Lora-community
-- **AI서버 Github** : https://github.com/lxxzdrgnl/Lora-training-api
+## 배포 주소
+
+### Production
+- **Frontend (AWS CloudFront)**: https://d2f4r8lrfwl0ez.cloudfront.net
+- **Frontend (JCloud)**: https://113.198.66.68:17196
+- **Base URL**: https://d3ka730j70ocy8.cloudfront.net
+- **Swagger UI**: https://d3ka730j70ocy8.cloudfront.net/swagger-ui.html
+- **Health Check**: https://d3ka730j70ocy8.cloudfront.net/actuator/health
+- **Test Endpoint**: https://d3ka730j70ocy8.cloudfront.net/test
+
+### Repository Links
+- **Backend Github**: https://github.com/lxxzdrgnl/Lora-community
+- **AI Server Github**: https://github.com/lxxzdrgnl/Lora-training-api
 
 ---
 ## 시스템 아키텍처 및 프로젝트 구조
