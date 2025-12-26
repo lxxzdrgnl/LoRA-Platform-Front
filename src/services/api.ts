@@ -360,6 +360,21 @@ export const api = {
       return handleResponse(response);
     },
 
+    async testLogin(): Promise<ApiResponse<{
+      accessToken: string;
+      refreshToken: string;
+      userId: number;
+      email: string;
+      nickname: string;
+      profileImageUrl: string;
+    }>> {
+      const response = await fetch(`${API_BASE_URL}/api/auth/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      return handleResponse(response);
+    },
+
     async getCurrentUser(): Promise<ApiResponse<Record<string, unknown>>> {
       const response = await authenticatedFetch(`${API_BASE_URL}/api/auth/me`, {
         headers: getAuthHeaders(),

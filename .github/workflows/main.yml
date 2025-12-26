@@ -148,48 +148,14 @@ jobs:
             sudo rm -rf /var/www/html/*
             sudo cp -r ~/dist/* /var/www/html/
 
-            # Nginx 설정 파일 생성 (HTTPS)
-            cat > /tmp/nginx_config << 'NGINX_CONFIG'
-server {
-    listen 443 ssl default_server;
-    listen [::]:443 ssl default_server;
+            # Nginx 설정이 없으면 기본 HTTPS 설정 생성
+            if [ ! -f /etc/nginx/sites-available/default.bak ]; then
+              sudo cp /etc/nginx/sites-available/default /etc/nginx/sites-available/default.bak
+              echo "Nginx default config backed up"
+            fi
 
-    ssl_certificate /etc/nginx/ssl/nginx.crt;
-    ssl_certificate_key /etc/nginx/ssl/nginx.key;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-
-    root /var/www/html;
-    index index.html;
-
-    server_name _;
-
-    location / {
-        try_files \$uri \$uri/ /index.html;
-    }
-
-    location /api {
-        proxy_pass http://localhost:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_cache_bypass \$http_upgrade;
-    }
-}
-
-server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
-    server_name _;
-    return 301 https://\$host\$request_uri;
-}
-NGINX_CONFIG
-
-            sudo mv /tmp/nginx_config /etc/nginx/sites-available/default
-
-            # Nginx 설정 테스트 및 재시작
-            sudo nginx -t && sudo systemctl restart nginx
+            # Nginx 재시작
+            sudo systemctl restart nginx
             sudo systemctl enable nginx
 
             echo "HTTPS deployment completed! Access via: https://113.198.66.75:17196"

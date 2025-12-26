@@ -7,6 +7,7 @@ import Profile from '../views/Profile.vue';
 import Search from '../views/Search.vue';
 import Training from '../views/Training.vue';
 import { useAuthStore } from '../stores/auth';
+import { api } from '../services/api';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -69,13 +70,34 @@ const router = createRouter({
     {
       path: '/test',
       name: 'test-login',
-      component: { template: '<div>Redirecting...</div>' },
-      beforeEnter: () => {
-        // CloudFront를 통해 백엔드 API로 리다이렉트 (상대 경로)
-        const redirectUrl = '/api/auth/test';
-        console.log('🔧 Redirecting to:', redirectUrl);
-        window.location.href = redirectUrl;
-        return false;
+      component: { template: '<div>Logging in with test account...</div>' },
+      beforeEnter: async (to, from, next) => {
+        try {
+          console.log('🔧 Test login: Calling POST /api/auth/test');
+          const response = await api.auth.testLogin();
+          const { accessToken, refreshToken, userId, email, nickname, profileImageUrl } = response.data;
+
+          console.log('✅ Test login successful:', { userId, email, nickname });
+
+          const authStore = useAuthStore();
+          authStore.setTokens(accessToken, refreshToken);
+          authStore.setUser({
+            id: userId,
+            email,
+            nickname,
+            profileImageUrl,
+            name: nickname,
+            role: 'USER',
+            createdAt: new Date().toISOString()
+          });
+
+          // Redirect to home
+          next({ name: 'home' });
+        } catch (error: any) {
+          console.error('❌ Test login failed:', error);
+          alert('Test login failed: ' + (error.message || 'Unknown error'));
+          next({ name: 'login' });
+        }
       },
     },
     {
