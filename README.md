@@ -14,6 +14,7 @@
 ![Vite](https://img.shields.io/badge/Vite-5.x-646CFF?style=flat-square&logo=vite&logoColor=white)
 ![Vue Router](https://img.shields.io/badge/Vue%20Router-4.x-4FC08D?style=flat-square&logo=vue.js&logoColor=white)
 ![Pinia](https://img.shields.io/badge/Pinia-2.x-FFD859?style=flat-square&logo=vue.js&logoColor=black)
+![Firebase](https://img.shields.io/badge/Firebase-10.x-FFCA28?style=flat-square&logo=firebase&logoColor=black)
 ![CSS](https://img.shields.io/badge/CSS-3-264DE4?style=flat-square&logo=css3&logoColor=white)
 
 ---
@@ -22,7 +23,9 @@
 
 - **다크/라이트 모드**: `useTheme` 컴포저블을 통해 사용자가 선호하는 테마(다크/라이트)를 선택하고 LocalStorage에 저장하여 유지합니다.
 - **반응형 디자인**: 모바일, 태블릿, 데스크톱 모든 기기에서 최적화된 UI를 제공합니다.
-- **간편 로그인**: Google OAuth2를 통한 소셜 로그인을 지원하며, JWT를 사용해 인증 상태를 Pinia로 관리합니다.
+- **다양한 로그인 방식**:
+  - **Firebase 이메일 로그인**: Firebase Authentication을 사용한 이메일/패스워드 인증 방식입니다. 프론트엔드에서 Firebase SDK로 직접 인증하고, 발급받은 ID Token을 백엔드로 전송하여 JWT로 교환합니다.
+  - **Google OAuth2 로그인**: Spring Security OAuth2를 통한 백엔드 경유 인증 방식입니다. 사용자가 Google 로그인 버튼을 클릭하면 백엔드의 `/oauth2/authorization/google` 엔드포인트로 리다이렉트되어 인증 후 JWT를 발급받습니다.
 - **모델 탐색**: 키워드 검색, 최신순/인기순 정렬, 태그 필터링 등 강력한 탐색 기능을 제공합니다.
 - **이미지 생성**: Stable Diffusion 모델과 LoRA를 조합하여 이미지를 생성하며, SSE를 통해 실시간 진행 상황을 표시합니다.
 - **LoRA 학습**: 사용자가 업로드한 이미지로 LoRA 모델을 학습시키며, 실시간으로 학습 진행률을 확인할 수 있습니다.
@@ -30,79 +33,101 @@
 
 ---
 
-## 배포 주소
+## 주요 링크
 
 ### Production
 - **Frontend (AWS CloudFront)**: https://d2f4r8lrfwl0ez.cloudfront.net
-- **Frontend (JCloud)**: https://113.198.66.68:17196
-- **Base URL**: https://d3ka730j70ocy8.cloudfront.net
-- **Swagger UI**: https://d3ka730j70ocy8.cloudfront.net/swagger-ui.html
-- **Health Check**: https://d3ka730j70ocy8.cloudfront.net/actuator/health
-- **Test Endpoint**: https://d3ka730j70ocy8.cloudfront.net/test
+- **Frontend (JCloud)**: http://113.198.66.75:18196
+- **Backend (AWS CloudFront)**: https://d3ka730j70ocy8.cloudfront.net
+- **Backend (JCloud)**: http://113.198.66.68:18232
+- **Swagger UI (AWS)**: https://d3ka730j70ocy8.cloudfront.net/swagger-ui.html
+- **Swagger UI (JCloud)**: http://113.198.66.68:18232/swagger-ui.html
+- **Health Check (AWS)**: https://d3ka730j70ocy8.cloudfront.net/actuator/health
+- **Health Check (JCloud)**: http://113.198.66.68:18232/actuator/health
 
 ### Repository Links
 - **Backend Github**: https://github.com/lxxzdrgnl/Lora-community
 - **AI Server Github**: https://github.com/lxxzdrgnl/Lora-training-api
 
 ---
-## 시스템 아키텍처 및 프로젝트 구조
 
-### 시스템 아키텍처
+## 시스템 아키텍처
+
 ```
-┌─────────────┐      ┌──────────────────┐      ┌─────────────────┐
-│   Vue.js    │ ←──→ │  Spring Boot 3   │ ←──→ │    FastAPI      │
-│  (Frontend) │      │    (Backend)     │      │  (AI Service)   │
-└─────────────┘      └────────┬─────────┘      └─────────────────┘
-                              │
-                              ↓
-                     ┌─────────────────┐
-                     │  AWS RDS (DB)   │
-                     └─────────────────┘
+┌─────────────┐      ┌───────────────────────────┐      ┌─────────────────┐
+│   Vue.js    │ <--> │ AWS Elastic Beanstalk     │ <--> │    FastAPI      │
+│  (Frontend) │      │ (Spring Boot 3 Backend)   │      │  (AI Service)   │
+└─────────────┘      └───────────┬───────────────┘      └─────────────────┘
+                                 │
+                    ┌────────────┴────────────┐
+                    │                         │
+                    v                         v
+            ┌─────────────────┐      ┌─────────────────┐
+            │   AWS RDS       │      │   AWS S3        │
+            │   (MySQL)       │      │   (Storage)     │
+            └─────────────────┘      └─────────────────┘
+                    │
+                    v
+            ┌─────────────────┐
+            │   Redis         │
+            │   (Upstash)     │
+            └─────────────────┘
 ```
 
-### 프로젝트 구조
+---
+
+## 프로젝트 구조
+
 ```
 src/
 ├── assets/
-│   └── main.css                    # 전역 스타일 및 CSS 유틸리티 클래스
+│   └── main.css                         # 전역 스타일 및 CSS 유틸리티 클래스
 ├── components/
-│   ├── generate/                   # 이미지 생성 관련 컴포넌트
-│   │   ├── GenerateModal.vue       # 이미지 생성 모달
+│   ├── generate/                        # 이미지 생성 관련 컴포넌트
+│   │   ├── GenerateModal.vue            # 이미지 생성 모달
 │   │   └── GenerateHistoryDetailModal.vue
-│   ├── models/                     # 모델 관련 컴포넌트
-│   │   ├── ModelCard.vue           # 모델 정보 카드
-│   │   ├── ModelDetailModal.vue    # 모델 상세 모달
-│   │   └── ModelDetailSkeleton.vue # 모델 로딩 스켈레톤
-│   ├── profile/                    # 프로필 페이지 하위 컴포넌트
-│   │   ├── ProfileHeader.vue       # 프로필 헤더
-│   │   ├── MyModelsTab.vue         # 내 모델 탭
-│   │   ├── FavoritesTab.vue        # 즐겨찾기 탭
-│   │   ├── HistoryTab.vue          # 히스토리 탭
-│   │   ├── GenerationHistoryList.vue
-│   │   └── TrainingHistoryList.vue
-│   ├── Navigation.vue              # 네비게이션 바
-│   ├── ThemeToggle.vue             # 다크/라이트 모드 토글
-│   └── TrainingPanel.vue           # 학습 패널
-├── composables/                    # 재사용 가능한 로직
-│   ├── useProfile.ts               # 프로필 관리 로직
-│   ├── useModels.ts                # 모델 관리 로직
-│   ├── useHistory.ts               # 히스토리 관리 로직
-│   └── useTheme.ts                 # 테마 관리 로직
-├── stores/                         # Pinia 상태 관리
-│   └── auth.ts                     # 인증 상태 관리 (Pinia Store)
-├── views/                          # 라우팅 페이지
-│   ├── ModelList.vue               # 모델 목록 페이지
-│   ├── Profile.vue                 # 프로필 페이지
-│   ├── Training.vue                # 학습 페이지
-│   ├── Search.vue                  # 검색 페이지
-│   ├── Login.vue                   # 로그인 페이지
-│   └── AuthCallback.vue            # OAuth 콜백 페이지
+│   ├── models/                          # 모델 관련 컴포넌트
+│   │   ├── ModelCard.vue                # 모델 정보 카드
+│   │   ├── ModelDetailModal.vue         # 모델 상세 모달
+│   │   └── ModelDetailSkeleton.vue      # 모델 로딩 스켈레톤
+│   ├── profile/                         # 프로필 페이지 하위 컴포넌트
+│   │   ├── ProfileHeader.vue            # 프로필 헤더
+│   │   ├── MyModelsTab.vue              # 내 모델 탭
+│   │   ├── FavoritesTab.vue             # 즐겨찾기 탭
+│   │   ├── HistoryTab.vue               # 히스토리 탭
+│   │   ├── GenerationHistoryList.vue    # 생성 히스토리 목록
+│   │   └── TrainingHistoryList.vue      # 학습 히스토리 목록
+│   ├── training/                        # 학습 관련 컴포넌트
+│   │   ├── TrainingForm.vue             # 학습 폼
+│   │   ├── TrainingHero.vue             # 학습 페이지 히어로
+│   │   ├── TrainingHistory.vue          # 학습 히스토리
+│   │   └── TrainingHistoryDetailModal.vue # 학습 히스토리 상세 모달
+│   ├── Navigation.vue                   # 네비게이션 바
+│   ├── ThemeToggle.vue                  # 다크/라이트 모드 토글
+│   └── TrainingPanel.vue                # 학습 패널
+├── composables/                         # 재사용 가능한 로직
+│   ├── useProfile.ts                    # 프로필 관리 로직
+│   ├── useModels.ts                     # 모델 관리 로직
+│   ├── useHistory.ts                    # 히스토리 관리 로직
+│   └── useTheme.ts                      # 테마 관리 로직
+├── config/
+│   └── firebase.ts                      # Firebase 설정 및 초기화
+├── stores/                              # Pinia 상태 관리
+│   └── auth.ts                          # 인증 상태 관리 (Pinia Store)
+├── views/                               # 라우팅 페이지
+│   ├── ModelList.vue                    # 모델 목록 페이지
+│   ├── Profile.vue                      # 프로필 페이지
+│   ├── Training.vue                     # 학습 페이지
+│   ├── Search.vue                       # 검색 페이지
+│   ├── Login.vue                        # 로그인 페이지
+│   ├── Register.vue                     # 회원가입 페이지
+│   └── AuthCallback.vue                 # OAuth 콜백 페이지
 ├── services/
-│   └── api.ts                      # API 클라이언트
+│   └── api.ts                           # API 클라이언트
 ├── router/
-│   └── index.ts                    # Vue Router 설정
-├── App.vue                         # 루트 컴포넌트
-└── main.ts                         # 애플리케이션 엔트리 포인트
+│   └── index.ts                         # Vue Router 설정
+├── App.vue                              # 루트 컴포넌트
+└── main.ts                              # 애플리케이션 엔트리 포인트
 ```
 
 ### 아키텍처 특징
@@ -120,14 +145,31 @@ src/
 - **Composition API**: Vue 3의 Composition API를 활용하여 로직을 효율적으로 재사용합니다.
 
 ---
-##  CI/CD
 
-- **GitHub Actions**를 사용하여 CI/CD 파이프라인을 구축했습니다.
-- `main` 브랜치에 코드가 푸시되면 다음 프로세스가 자동으로 실행됩니다:
-  1.  Node.js 환경을 설정합니다.
-  2.  프로젝트 의존성을 설치합니다 (`npm install`).
-  3.  프로젝트를 빌드합니다 (`npm run build`).
-  4.  AWS S3 버킷에 빌드된 정적 파일을 배포하여 사용자가 항상 최신 버전을 이용할 수 있도록 합니다.
+## CI/CD
+
+**GitHub Actions**를 사용하여 AWS와 JCloud 두 환경으로 자동 배포되는 CI/CD 파이프라인을 구축했습니다.
+
+### 배포 프로세스
+
+`main` 브랜치에 코드가 푸시되면 다음 프로세스가 자동으로 실행됩니다:
+
+#### 1. AWS CloudFront 배포
+1. Node.js 20 환경 설정
+2. 의존성 설치 (`npm ci`)
+3. AWS용 환경변수로 프로젝트 빌드
+4. AWS S3 버킷에 정적 파일 업로드
+5. CloudFront 캐시 무효화
+
+#### 2. JCloud 배포
+1. Node.js 20 환경 설정
+2. 의존성 설치 (`npm ci`)
+3. JCloud용 환경변수로 프로젝트 빌드
+4. SSH를 통해 JCloud 서버 (113.198.66.75:19196)에 접속
+5. 빌드된 파일을 Nginx 서빙 디렉토리로 복사
+6. Nginx 재시작
+
+이를 통해 AWS와 JCloud 두 환경에서 사용자가 항상 최신 버전을 이용할 수 있도록 합니다.
 
 ---
 
@@ -135,12 +177,13 @@ src/
 
 ### 1. 환경 변수 설정
 
-프로젝트가 백엔드 API와 통신하려면 `.env` 파일에 API 서버 주소를 명시해야 합니다.
+프로젝트가 백엔드 API와 통신하려면 `.env` 파일에 필요한 환경 변수를 설정해야 합니다.
 
 ```env
 # .env
 VITE_API_BASE_URL=http://localhost:8080       # 메인 백엔드 API 서버
 VITE_FRONTEND_URL=http://localhost:5173       # 프론트엔드 URL
+VITE_FIREBASE_API_KEY=your_firebase_api_key   # Firebase API Key
 ```
 
 ### 2. 의존성 설치 및 실행
@@ -204,17 +247,22 @@ npm run build
 
 1. **Pinia 도입**: 기존의 `authStore` 객체를 Pinia 기반의 상태 관리로 전환하여 Vue 3의 반응성 시스템과 통합했습니다.
 
-2. **컴포넌트 모듈화**:
+2. **Firebase 인증 시스템 추가**:
+   - Firebase Authentication을 통한 이메일/패스워드 로그인 구현
+   - 기존 Google OAuth2와 함께 다중 인증 방식 지원
+   - Firebase ID Token을 백엔드 JWT로 교환하는 하이브리드 인증 구조 구축
+
+3. **컴포넌트 모듈화**:
    - Profile.vue (615줄 → 238줄)를 7개의 작은 컴포넌트로 분리
-   - 기능별로 폴더 구조를 정리 (profile/, models/, generate/)
+   - 기능별로 폴더 구조를 정리 (profile/, models/, generate/, training/)
 
-3. **Composables 패턴**:
+4. **Composables 패턴**:
    - 재사용 가능한 로직을 composable 함수로 추출
-   - useProfile, useModels, useHistory를 통한 관심사 분리
+   - useProfile, useModels, useHistory, useTheme를 통한 관심사 분리
 
-4. **타입 안정성**: 모든 컴포넌트와 함수에 TypeScript 타입 정의 추가
+5. **타입 안정성**: 모든 컴포넌트와 함수에 TypeScript 타입 정의 추가
 
-5. **코드 품질**:
+6. **코드 품질**:
    - 타입 체크 통과
    - 프로덕션 빌드 성공
    - Import 경로 정리 및 일관성 확보
